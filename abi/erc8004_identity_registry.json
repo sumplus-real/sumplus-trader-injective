@@ -1,0 +1,47 @@
+{
+  "_source": "ERC-8004 Trustless Agents — IdentityRegistry reference interface (ERC-721 based). VERIFY against the deployed contract 0x8004a169fb4a3325136eb29fa0ceb6d2e539a432 before any mainnet registration; set ERC8004_FETCH_ABI=1 with an explorer key to pull the exact deployed ABI at go-live.",
+  "abi": [
+    {
+      "type": "function",
+      "name": "register",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        { "name": "tokenURI", "type": "string" },
+        { "name": "metadata", "type": "tuple[]", "components": [
+          { "name": "key", "type": "string" },
+          { "name": "value", "type": "string" }
+        ] }
+      ],
+      "outputs": [ { "name": "agentId", "type": "uint256" } ]
+    },
+    {
+      "type": "function",
+      "name": "ownerOf",
+      "stateMutability": "view",
+      "inputs": [ { "name": "tokenId", "type": "uint256" } ],
+      "outputs": [ { "name": "owner", "type": "address" } ]
+    },
+    {
+      "type": "function",
+      "name": "tokenURI",
+      "stateMutability": "view",
+      "inputs": [ { "name": "tokenId", "type": "uint256" } ],
+      "outputs": [ { "name": "uri", "type": "string" } ]
+    },
+    {
+      "type": "function",
+      "name": "totalSupply",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [ { "name": "", "type": "uint256" } ]
+    },
+    {
+      "type": "event",
+      "name": "Registered",
+      "inputs": [
+        { "name": "agentId", "type": "uint256", "indexed": true },
+        { "name": "owner", "type": "address", "indexed": true }
+      ]
+    }
+  ]
+}

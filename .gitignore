@@ -1,0 +1,8 @@
+__pycache__/
+.DS_Store
+.env
+.venv/
+*.pyc
+ledger.jsonl
+portfolio_state.json
+runtime_state.json

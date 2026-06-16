@@ -1,0 +1,30 @@
+{
+  "_comment": "BNB Hack: AI Trading Agent (Track 1) config. Live PnL on BSC (chain 56) over 6/22-28, ranked by total return with a max-drawdown gate (breach = elimination), a minimum trade count, and simulated transaction costs. The brain proposes; these deterministic caps clamp. Same caps are also enforced server-side by the execution layer's delegation policy.",
+
+  "mode": "paper",
+
+  "chains": {
+    "bsc":    { "chain_id": 56,   "enabled": true },
+    "mantle": { "chain_id": 5000, "enabled": false }
+  },
+
+  "allowed_pairs": [
+    { "chain": "bsc", "from": "USDT", "to": "WBNB" },
+    { "chain": "bsc", "from": "WBNB", "to": "USDT" }
+  ],
+
+  "allowed_tokens": ["USDT", "USDC", "WBNB", "BNB", "BTCB"],
+
+  "risk": {
+    "max_single_trade_usd": 100,
+    "max_position_pct": 0.50,
+    "max_trades_per_hour": 6,
+    "max_drawdown_pct": 6.0,
+    "min_trade_interval_seconds": 300,
+    "default_slippage_bps": 50
+  },
+
+  "loop": {
+    "tick_seconds": 600
+  }
+}

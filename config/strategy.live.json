@@ -1,0 +1,29 @@
+{
+  "_comment": "LIVE execution profile for the on-chain proof run on Mantle. Selected via STRATEGY_CONFIG=config/strategy.live.json. Only MNT->USDC is enabled (the wallet holds native MNT); single-trade cap is small (4 MNT ~= $3) so each autonomous decision leaves a cheap, real, verifiable trace on Mantle. The demo's source-of-truth config (config/strategy.json) is left untouched.",
+
+  "mode": "live",
+
+  "chains": {
+    "mantle": { "chain_id": 5000, "enabled": true },
+    "bsc":    { "chain_id": 56,   "enabled": false }
+  },
+
+  "allowed_pairs": [
+    { "chain": "mantle", "from": "MNT", "to": "USDC" }
+  ],
+
+  "allowed_tokens": ["USDC", "USDT", "MNT", "WMNT"],
+
+  "risk": {
+    "max_single_trade_usd": 4,
+    "max_position_pct": 0.30,
+    "max_trades_per_hour": 6,
+    "max_drawdown_pct": 8.0,
+    "min_trade_interval_seconds": 45,
+    "default_slippage_bps": 100
+  },
+
+  "loop": {
+    "tick_seconds": 60
+  }
+}
