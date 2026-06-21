@@ -45,6 +45,14 @@ Trust Wallet Agent Kit, CoinMarketCap MCP, CoinMarketCap Agent Hub Strategy Skil
 === REPO ===
 https://github.com/sumplus-real/sumplus-trader-bnb
 
+=== ON-CHAIN PROOF (BSC) ===
+Agent wallet (BSC participant address): 0xaFf9e1C61dEA470060894f396227fabF8Bfa3157
+ERC-8004 agent identity: 56:0x8004a169fb4a3325136eb29fa0ceb6d2e539a432:139543 (agent ID 139543)
+Committed policy hash: sha256:fb0d30ef0f7d31b868055a51ca651a39fd03736e9f4d597150614686a6bdb65a
+BNB Hack registration tx: https://bscscan.com/tx/0xe048cd9747c8ac918608e7e51cdaddc17d50bb26837c3b2968a5e6bd6960aaa7
+ERC-8004 mint + on-chain policy commitment tx: https://bscscan.com/tx/0x0948d1ff639acc1725ecc369f68629bab0cb83b96f0a0f6fd36f24034d89d621
+The policy hash is written as on-chain metadata on the agent identity, so anyone can read it back and confirm the rules were fixed before the trading window.
+
 === DEMO (live dashboard) ===
 [paste Render URL after deploy. It renders the offline simulation now and accrues live data into the same link during 6/22 to 6/28.]
 
