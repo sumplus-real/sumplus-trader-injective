@@ -8,6 +8,10 @@ ledger.jsonl
 portfolio_state.json
 runtime_state.json
 live_state.json
+live_state.json.diverged_*
+live_run.log
+live.pid
+backup_pretest_*/
 heartbeat.txt
 STOP
 # committed for the demo so a fresh clone shows the dashboard + passes `verify`:

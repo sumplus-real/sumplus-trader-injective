@@ -18,8 +18,16 @@ class PersistentState:
         "positions": {},
         "high_water_mark": 0.0,
         "nav": 0.0,
+        "stable_usd": 0.0,
         "receipt_seq": 0,
         "last_tick_ts": 0.0,
+        "last_trade_ts": 0.0,
+        "trades_this_week": 0,
+        "trades_last_hour": 0,
+        "intent_seq": 0,
+        # pending_intent != None means a trade was persisted right before broadcast and we have not
+        # confirmed it settled. On restart the loop must reconcile from chain instead of re-deciding.
+        "pending_intent": None,
         "mode": "paper",
         "kill": False,
     }
@@ -69,6 +77,21 @@ class PersistentState:
         if unknown:
             raise StateError(f"unknown state fields: {sorted(unknown)}")
         self.data.update(kw)
+        self.save()
+        return dict(self.data)
+
+    def write(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Persist the WHOLE state in a single atomic save.
+
+        The live loop carries a richer state than DEFAULTS (cash, trade counters, pending intent),
+        so we store the full dict rather than validate field-by-field. One save per tick keeps the
+        on-disk snapshot atomic and consistent — a crash mid-tick leaves the *previous* complete
+        snapshot, never a half-written one. This replaces the old per-field update() loop that
+        crashed on the first non-DEFAULTS key and left guardrail counters unpersisted."""
+        merged = dict(self.DEFAULTS)
+        merged["positions"] = {}
+        merged.update(state)
+        self.data = merged
         self.save()
         return dict(self.data)
 

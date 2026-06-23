@@ -121,20 +121,26 @@ async def _freeform(message: str) -> str:
     if not os.environ.get("DEEPSEEK_API_KEY"):
         return ("I can answer: status, positions, why, policy, pause, resume, tick, "
                 "or 'set cap <field> <value>'.")
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=os.environ["DEEPSEEK_API_KEY"],
-                         base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+    # DeepSeek is OpenAI-compatible REST — call it directly with httpx (already a dependency), no SDK.
+    import httpx
     context = _status() + "\n" + _policy()
-    resp = await client.chat.completions.create(
-        model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
-        messages=[
-            {"role": "system", "content": "You are the trading agent speaking to its operator. "
-             "Answer briefly and factually using the provided state. Do not invent numbers."},
-            {"role": "user", "content": f"State:\n{context}\n\nOperator asks: {message}"},
-        ],
-        temperature=0.3,
-    )
-    return resp.choices[0].message.content or ""
+    base = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{base}/chat/completions",
+            headers={"Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}"},
+            json={
+                "model": os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+                "messages": [
+                    {"role": "system", "content": "You are the trading agent speaking to its operator. "
+                     "Answer briefly and factually using the provided state. Do not invent numbers."},
+                    {"role": "user", "content": f"State:\n{context}\n\nOperator asks: {message}"},
+                ],
+                "temperature": 0.3,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"].get("content") or ""
 
 
 def repl() -> None:

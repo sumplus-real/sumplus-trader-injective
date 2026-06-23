@@ -9,6 +9,6 @@ from agent.brain.mock_brain import MockBrain
 
 def make_brain() -> Brain:
     if os.environ.get("DEEPSEEK_API_KEY"):
-        from agent.brain.deepseek_strategy import DeepSeekBrain  # lazy: openai import only when used
+        from agent.brain.deepseek_strategy import DeepSeekBrain  # lazy import
         return DeepSeekBrain()
     return MockBrain()

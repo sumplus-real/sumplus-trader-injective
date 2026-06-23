@@ -23,6 +23,27 @@ from agent.types import ExecutionResult
 
 TWAK_BIN = os.environ.get("TWAK_BIN", "twak")
 
+# BSC token registry. twak resolves USDT/USDC/WBNB/ETH by symbol but NOT BTCB/CAKE, so we map
+# every universe + quote symbol to its canonical BSC contract address and always pass addresses.
+# Keyed per chain; the hackathon trades BSC only.
+_TOKEN_ADDRESSES = {
+    "bsc": {
+        "USDT": "0x55d398326f99059fF775485246999027B3197955",
+        "USDC": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+        "WBNB": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        "BTCB": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+        "ETH": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+        "CAKE": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
+    },
+}
+
+
+def _resolve_token(chain: str, token: str) -> str:
+    # Pass raw addresses through; map known symbols to addresses; otherwise let twak try the symbol.
+    if token.startswith("0x"):
+        return token
+    return _TOKEN_ADDRESSES.get(chain, {}).get(token.upper(), token)
+
 
 class TwakBackend(ExecutionBackend):
     def __init__(self, chain_default: str = "bsc", dry_run: bool | None = None):
@@ -32,15 +53,21 @@ class TwakBackend(ExecutionBackend):
 
     def _cmd(self, action: str, chain: str, from_token: str, to_token: str,
              amount: str, slippage_bps: int) -> list[str]:
-        # Command template for the TWAK CLI swap action. Flags are finalised against `twak --help`
-        # at install time; the shape (from/to/amount/chain/slippage + json) is what we encode.
-        return [
+        # Real twak swap CLI: `twak swap <from> <to> --usd <amt> --chain <c> --slippage <pct> [--quote-only] --json`
+        # `amount` is a USD value (the executor reasons in USD), so --usd handles the from-token
+        # conversion correctly on both entries (USDT->risky) and exits (risky->USDT). Slippage is a
+        # percent, not bps. Execution is the default; --quote-only is the only modifier.
+        slippage_pct = f"{slippage_bps / 100.0:g}"
+        cmd = [
             TWAK_BIN, "swap",
-            "--from", from_token, "--to", to_token, "--amount", amount,
-            "--chain", chain, "--slippage-bps", str(slippage_bps),
-            "--quote-only" if action == "get_quote" else "--execute",
+            _resolve_token(chain, from_token), _resolve_token(chain, to_token),
+            "--usd", amount,
+            "--chain", chain, "--slippage", slippage_pct,
             "--json",
         ]
+        if action == "get_quote":
+            cmd.append("--quote-only")
+        return cmd
 
     def _run(self, cmd: list[str]) -> dict[str, Any]:
         if self.dry_run:
@@ -64,10 +91,12 @@ class TwakBackend(ExecutionBackend):
                                    from_token, to_token, amount, slippage_bps))
         if out.get("dry_run"):
             return ExecutionResult(executed=False, dry_run=True, detail=out)
+        # twak returns the broadcast tx under "hash" (with an "explorer" URL); accept legacy keys too.
+        tx = out.get("hash") or out.get("txHash") or out.get("transactionHash")
         return ExecutionResult(
-            executed=bool(out.get("txHash") or out.get("executed")),
+            executed=bool(tx or out.get("executed")),
             dry_run=False,
-            detail={"tx": out.get("txHash"), "source": "twak", **out},
+            detail={"tx": tx, "source": "twak", **out},
         )
 
 

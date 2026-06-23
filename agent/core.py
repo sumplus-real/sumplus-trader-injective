@@ -82,11 +82,17 @@ class TickResult:
 
 
 async def tick(*, state: dict, executor: Optional[Executor] = None, cfg: Optional[dict] = None,
-               now_ts: Optional[float] = None, market: Optional[tuple] = None) -> tuple[TickResult, dict]:
+               now_ts: Optional[float] = None, market: Optional[tuple] = None,
+               persist: Optional[Any] = None) -> tuple[TickResult, dict]:
     """Run one decision. Returns (result, updated_state). Pure-ish: caller persists the state.
 
     `market` optionally injects (views, data_ts) — used by the simulator to drive the exact same
-    pipeline off a synthetic price series instead of the live CMC feed."""
+    pipeline off a synthetic price series instead of the live CMC feed.
+
+    `persist` is an optional callback(state_dict) the live loop passes so we can durably mark an
+    intent as pending *before* the swap is broadcast. If the process dies between broadcast and
+    book-keeping, the restart sees the pending intent, reconciles from chain, and does NOT re-fire
+    the same trade — the root fix for the over-execution bug."""
     cfg = cfg or load_config()
     now_ts = now_ts or time.time()
     ph = committed_policy_hash()
@@ -157,19 +163,38 @@ async def tick(*, state: dict, executor: Optional[Executor] = None, cfg: Optiona
                         size_usd=float(cfg["risk"]["max_single_trade_usd"]) * 0.3)
             result.abstained = True
 
-    # Execution (only on an allowed/clamped trade). The internal fill is always booked so the
-    # portfolio evolves; the executor is the real-world side-effect (mock/paper/live/TWAK).
+    # Execution (only on an allowed/clamped trade). We book the internal fill only when the trade
+    # actually executed (live/TWAK) or is a simulated/mock fill — never on a live executed=False,
+    # which would record a phantom position. The executor is the real-world side-effect.
     new_state = dict(state)
+    new_state["pending_intent"] = None
     if pv.allowed and decision.is_trade():
         amount = pv.final_amount_usd
-        if executor is not None:
+        if executor is not None and executor.mode not in ("mock", "paper"):
+            # Durably mark the intent BEFORE broadcasting, so a crash mid-swap is recoverable
+            # (the restart reconciles from chain instead of re-firing this same trade).
+            seq = int(state.get("intent_seq", 0)) + 1
+            pending = {"seq": seq, "side": decision.side, "from_token": decision.from_token,
+                       "to_token": decision.to_token, "amount_usd": amount, "ts": _iso(now_ts)}
+            if persist is not None:
+                staged = dict(new_state)
+                staged["intent_seq"] = seq
+                staged["pending_intent"] = pending
+                persist(staged)
+            new_state["intent_seq"] = seq
+            exec_res = await executor.execute(decision, amount)
+            result.executed = bool(exec_res.executed)
+        elif executor is not None:
             exec_res = await executor.execute(decision, amount)
             result.executed = bool(exec_res.executed) or executor.mode in ("mock", "paper")
         else:
             result.executed = True  # simulated fill
-        _apply_fill(new_state, decision, amount, price, now_ts)
-        new_state["last_trade_ts"] = now_ts
-        new_state["trades_this_week"] = int(state.get("trades_this_week", 0)) + 1
+
+        if result.executed:
+            _apply_fill(new_state, decision, amount, price, now_ts)
+            new_state["last_trade_ts"] = now_ts
+            new_state["trades_this_week"] = int(state.get("trades_this_week", 0)) + 1
+        new_state["pending_intent"] = None
 
     # mark abstentions to market once they have aged ~24h, so the price has had time to move
     # and the avoided-loss / missed-gain figure is meaningful rather than ~0.
