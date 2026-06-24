@@ -4,6 +4,13 @@ __pycache__/
 .git/
 .env
 .DS_Store
+.agentalk/
+.twak/
+node_modules/
 live_state.json
+live_state.json.diverged_*
+live_run.log
+live.pid
 heartbeat.txt
 STOP
+backup_pretest_*/

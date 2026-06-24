@@ -19,9 +19,10 @@ from pathlib import Path
 from typing import Any, Optional
 
 from agent.policy.canonical import canonical_bytes, sha256_hex
+from agent.ops.paths import data_path
 
 GENESIS = "sha256:" + "0" * 64
-RECEIPTS_PATH = Path(__file__).resolve().parent.parent.parent / "receipts.jsonl"
+RECEIPTS_PATH = data_path("receipts.jsonl")
 
 
 @dataclass

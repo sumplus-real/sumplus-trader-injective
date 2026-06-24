@@ -22,6 +22,7 @@ from agent.policy.commit import build_commitment, verify_live
 from agent.policy.receipt import ReceiptChain, Receipt, GENESIS
 from agent.abstention.ledger import AbstentionLedger
 from agent.data.cmc import x402_summary
+from agent.ops.paths import data_path
 
 ROOT = Path(__file__).resolve().parent.parent
 app = FastAPI(title="Sumplus Trader — verifiable autonomous trading")
@@ -37,7 +38,7 @@ def _proof() -> dict[str, Any]:
 
 
 def _equity() -> list[dict[str, Any]]:
-    p = ROOT / "sim_equity.jsonl"
+    p = data_path("sim_equity.jsonl")
     if not p.exists():
         return []
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]

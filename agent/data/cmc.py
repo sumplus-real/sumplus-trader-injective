@@ -17,8 +17,9 @@ from typing import Any, Optional
 import httpx
 
 from agent.strategy.signals import TokenView
+from agent.ops.paths import data_path
 
-X402_RECEIPTS_PATH = Path(__file__).resolve().parent.parent.parent / "x402_receipts.jsonl"
+X402_RECEIPTS_PATH = data_path("x402_receipts.jsonl")
 
 # Deterministic offline scenario: one clean uptrend (entry), one high-vol (risk_off),
 # one chop (neutral), one mild. Lets the demo show enter + abstentions with distinct reasons.

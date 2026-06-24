@@ -23,6 +23,7 @@ from agent.data.cmc import get_token_views
 from agent.execution.executor import Executor
 from agent.execution.factory import make_backend
 from agent.ops.onchain import read_token_balances
+from agent.ops.paths import data_path
 from agent.ops.rpc import RpcPool
 from agent.ops.state import PersistentState
 from agent.ops.watchdog import run_with_watchdog
@@ -31,7 +32,7 @@ from agent.policy.canonical import load_config
 ROOT = Path(__file__).resolve().parent.parent
 HEARTBEAT = str(ROOT / "heartbeat.txt")
 KILL = str(ROOT / "STOP")
-STATE_FILE = str(ROOT / "live_state.json")
+STATE_FILE = str(data_path("live_state.json"))
 
 # A position worth less than this is treated as dust and ignored when reconciling from chain.
 DUST_USD = 1.0

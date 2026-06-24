@@ -12,7 +12,9 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Optional
 
-LEDGER_PATH = Path(__file__).resolve().parent.parent.parent / "abstentions.jsonl"
+from agent.ops.paths import data_path
+
+LEDGER_PATH = data_path("abstentions.jsonl")
 
 VALID_REASONS = {
     "stale_data", "vol_spike", "thin_liquidity", "drawdown_proximity",

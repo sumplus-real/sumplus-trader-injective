@@ -7,7 +7,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-LEDGER_PATH = Path(__file__).resolve().parent.parent / "ledger.jsonl"
+from agent.ops.paths import data_path
+
+LEDGER_PATH = data_path("ledger.jsonl")
 
 
 def record(event: str, payload: dict[str, Any]) -> None:
