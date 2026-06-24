@@ -11,6 +11,7 @@ Run:  python -m agent.cli web   →  http://127.0.0.1:8800
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,11 @@ async def api_overview():
     cfg = _cfg()
     eq = _equity()
     last = eq[-1] if eq else {}
-    nav0 = eq[0]["nav"] if eq else cfg.get("_nav0", 500.0)
+    # Live server: measure return against the funded amount (START_NAV) so it reflects real P&L,
+    # not "return since the dashboard started". Offline demo measures against the backtest start.
+    _start = os.environ.get("START_NAV")
+    on_live_curve = bool(_jsonl(data_path("live_equity.jsonl")))
+    nav0 = float(_start) if (on_live_curve and _start) else (eq[0]["nav"] if eq else cfg.get("_nav0", 500.0))
     nav = last.get("nav", nav0)
     peak_dd = max((p.get("drawdown_pct", 0.0) for p in eq), default=0.0)
     abss = AbstentionLedger().summary()
