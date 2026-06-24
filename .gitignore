@@ -8,6 +8,7 @@ ledger.jsonl
 portfolio_state.json
 runtime_state.json
 live_state.json
+live_equity.jsonl
 live_state.json.diverged_*
 live_run.log
 live.pid

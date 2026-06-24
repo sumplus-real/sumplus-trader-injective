@@ -37,11 +37,16 @@ def _proof() -> dict[str, Any]:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
-def _equity() -> list[dict[str, Any]]:
-    p = data_path("sim_equity.jsonl")
+def _jsonl(p) -> list[dict[str, Any]]:
     if not p.exists():
         return []
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+
+
+def _equity() -> list[dict[str, Any]]:
+    # Live server: the real NAV curve the loop records each tick. Offline/demo: the backtest curve.
+    live = _jsonl(data_path("live_equity.jsonl"))
+    return live if live else _jsonl(data_path("sim_equity.jsonl"))
 
 
 @app.get("/api/overview")

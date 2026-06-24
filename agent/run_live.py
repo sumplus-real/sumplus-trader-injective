@@ -14,6 +14,7 @@ retry). Each tick runs the same core.tick used in the demo and the simulator.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from pathlib import Path
@@ -33,6 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HEARTBEAT = str(ROOT / "heartbeat.txt")
 KILL = str(ROOT / "STOP")
 STATE_FILE = str(data_path("live_state.json"))
+EQUITY_FILE = str(data_path("live_equity.jsonl"))
 
 # A position worth less than this is treated as dust and ignored when reconciling from chain.
 DUST_USD = 1.0
@@ -78,6 +80,29 @@ def sync_state_from_chain(state: dict, rpc: RpcPool, wallet: str, price: dict, c
     state["positions"] = positions
     state["stable_usd"] = stable_usd
     return True
+
+
+def _append_equity_point(state: dict, result) -> None:
+    """Append one real NAV point per tick so the dashboard renders the live equity curve
+    (not the backtest). Defensive: dashboard bookkeeping must never break the trading loop."""
+    nav = float(state.get("nav", 0.0))
+    hwm = float(state.get("high_water_mark", nav)) or nav
+    dd = max(0.0, (hwm - nav) / hwm * 100) if hwm > 0 else 0.0
+    stable = float(state.get("stable_usd", 0.0))
+    risky = max(0.0, (nav - stable) / nav * 100) if nav > 0 else 0.0
+    point = {
+        "ts": time.time(), "nav": round(nav, 4), "drawdown_pct": round(dd, 2),
+        "risky_exposure_pct": round(risky, 2),
+        "regime": "risk_on" if risky > 0.5 else "neutral",
+        "action": (result.decision or {}).get("side", "hold") if result else "hold",
+        "verdict": getattr(result, "verdict", "hold") if result else "hold",
+        "rung": (getattr(result, "ladder_rung", "none") or "none"),
+    }
+    try:
+        with open(EQUITY_FILE, "a") as f:
+            f.write(json.dumps(point) + "\n")
+    except Exception as e:  # noqa: BLE001
+        print(f"[equity] append failed (non-fatal): {e}")
 
 
 async def _loop_once_forever() -> None:
@@ -130,6 +155,11 @@ async def _loop_once_forever() -> None:
             result, state = await core.tick(state=state, executor=execu, cfg=cfg,
                                             market=(views, data_ts), persist=ps.write)
             core.mark_nav(state, price)
+
+            # Update the high-water mark and record a real equity point for the dashboard.
+            nav_now = float(state.get("nav", 0.0))
+            state["high_water_mark"] = max(float(state.get("high_water_mark", nav_now) or nav_now), nav_now)
+            _append_equity_point(state, result)
 
             # 4) One atomic snapshot per tick. A crash leaves the previous complete snapshot intact.
             state["last_tick_ts"] = time.time()
