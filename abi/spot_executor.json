@@ -1,0 +1,97 @@
+{
+  "abi": [
+    {
+      "type": "constructor",
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "owner",
+      "stateMutability": "view",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address" }]
+    },
+    {
+      "type": "function",
+      "name": "deposit",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        { "name": "subaccountID", "type": "string" },
+        { "name": "denom", "type": "string" },
+        { "name": "amount", "type": "uint256" }
+      ],
+      "outputs": [{ "name": "", "type": "bool" }]
+    },
+    {
+      "type": "function",
+      "name": "withdraw",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        { "name": "subaccountID", "type": "string" },
+        { "name": "denom", "type": "string" },
+        { "name": "amount", "type": "uint256" }
+      ],
+      "outputs": [{ "name": "", "type": "bool" }]
+    },
+    {
+      "type": "function",
+      "name": "placeSpotMarketOrder",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        { "name": "marketID", "type": "string" },
+        { "name": "subaccountID", "type": "string" },
+        { "name": "feeRecipient", "type": "string" },
+        { "name": "price", "type": "uint256" },
+        { "name": "quantity", "type": "uint256" },
+        { "name": "cid", "type": "string" },
+        { "name": "orderType", "type": "string" }
+      ],
+      "outputs": [{ "name": "orderHash", "type": "string" }]
+    },
+    {
+      "type": "function",
+      "name": "subaccountBalance",
+      "stateMutability": "view",
+      "inputs": [
+        { "name": "subaccountID", "type": "string" },
+        { "name": "denom", "type": "string" }
+      ],
+      "outputs": [
+        { "name": "available", "type": "uint256" },
+        { "name": "total", "type": "uint256" }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "transferOwnership",
+      "stateMutability": "nonpayable",
+      "inputs": [{ "name": "newOwner", "type": "address" }],
+      "outputs": []
+    },
+    {
+      "type": "event",
+      "name": "SpotMarketOrderResult",
+      "anonymous": false,
+      "inputs": [
+        { "name": "orderHash", "type": "string", "indexed": false },
+        { "name": "marketID", "type": "string", "indexed": false },
+        { "name": "orderType", "type": "string", "indexed": false },
+        { "name": "requestedQuantity", "type": "uint256", "indexed": false },
+        { "name": "filledQuantity", "type": "uint256", "indexed": false },
+        { "name": "avgPrice", "type": "uint256", "indexed": false },
+        { "name": "cid", "type": "string", "indexed": false }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "Deposited",
+      "anonymous": false,
+      "inputs": [
+        { "name": "subaccountID", "type": "string", "indexed": false },
+        { "name": "denom", "type": "string", "indexed": false },
+        { "name": "amount", "type": "uint256", "indexed": false }
+      ]
+    }
+  ]
+}

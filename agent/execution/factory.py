@@ -9,11 +9,15 @@ from agent.execution.mock_backend import MockBackend
 
 
 def make_backend(mode: str) -> ExecutionBackend:
-    # EXECUTION_BACKEND wins when set: twak (official signer) | maria (our hosted layer) | mock.
+    # EXECUTION_BACKEND wins when set: twak (BSC signer) | injective (Helix spot) |
+    # maria (our hosted layer) | mock.
     chosen = os.environ.get("EXECUTION_BACKEND", "").lower()
     if chosen == "twak":
         from agent.execution.twak_backend import TwakBackend  # lazy: subprocess wrapper
         return TwakBackend()
+    if chosen == "injective":
+        from agent.execution.injective_backend import InjectiveBackend  # lazy: web3 only when used
+        return InjectiveBackend()
     if chosen == "mock" or mode == "mock":
         return MockBackend()
     if chosen == "maria" or os.environ.get("MARIA_BASE_URL"):

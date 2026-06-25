@@ -1,0 +1,235 @@
+"""Injective execution backend — places Helix spot MARKET orders via SpotExecutor.
+
+The Injective analogue of TwakBackend. Same contract as every backend (get_quote /
+execute_swap on USD amounts); the decision + policy clamp already happened upstream.
+
+What it does differently from the BSC AMM path:
+  - Helix is an order book, not an AMM. "Spend $50 of USDT on INJ" becomes a spot
+    market BUY: quantity = $50 / ref_price (base units), price = ref_price * (1+slip)
+    as the worst acceptable price (slippage bound). A market SELL is the mirror.
+  - Orders go through the SpotExecutor contract (direct mode), not an EOA, because an
+    EOA cannot call the Exchange precompile directly.
+  - Funds live in the contract's exchange subaccount (deposited once at setup), so the
+    per-trade path is just: size -> placeSpotMarketOrder -> read back the subaccount.
+
+Reference price comes from the live Helix order book (Injective indexer REST), so we
+size against real depth. If the book is unreachable we FAIL CLOSED (return an error so
+the agent holds) rather than trade against a guessed price, matching onchain.py's rule.
+
+dry_run (default whenever the contract/RPC/key is not configured) returns the exact
+call that WOULD be sent, so the integration is inspectable offline with zero keys.
+"""
+from __future__ import annotations
+
+import json
+import os
+from decimal import Decimal
+from pathlib import Path
+from typing import Any, Optional
+
+from agent.execution.backend import ExecutionBackend
+from agent.ops import injective_market as mkt
+from agent.types import ExecutionResult
+
+_ABI_PATH = Path(os.environ.get(
+    "INJ_EXECUTOR_ABI_PATH",
+    str(Path(__file__).resolve().parent.parent.parent / "abi" / "spot_executor.json"),
+))
+
+# Injective indexer REST base (chain-exchange API). Override for testnet.
+_INDEXER_URL = os.environ.get(
+    "INJ_INDEXER_URL", "https://sentry.exchange.grpc-web.injective.network"
+).rstrip("/")
+
+
+class InjectiveError(Exception):
+    pass
+
+
+class InjectiveBackend(ExecutionBackend):
+    def __init__(self, dry_run: Optional[bool] = None, default_subaccount_index: int = 1):
+        self.rpc_url = os.environ.get("INJ_RPC", "")
+        self.executor_addr = os.environ.get("INJ_EXECUTOR_ADDRESS", "")
+        self._pk = os.environ.get("AGENT_WALLET_PRIVATE_KEY", "")
+        self.fee_recipient = os.environ.get("INJ_FEE_RECIPIENT", "")  # "" => chain default
+        self.subaccount_index = int(os.environ.get("INJ_SUBACCOUNT_INDEX", default_subaccount_index))
+        # Fail-closed reference price override for offline/illiquid books (USD per base).
+        self._ref_price_env = os.environ.get("INJ_REF_PRICE_INJ", "")
+        # Default to dry-run unless fully wired for a live broadcast.
+        configured = bool(self.rpc_url and self.executor_addr and self._pk)
+        self.dry_run = (not configured) if dry_run is None else dry_run
+
+    # ---- pricing -----------------------------------------------------------
+
+    def _ref_price(self, base: str, quote: str, side: str) -> Decimal:
+        """USD price per base unit from the live Helix book: best ask for a buy, best
+        bid for a sell. Falls back to INJ_REF_PRICE_INJ only if explicitly set."""
+        try:
+            mid = mkt.market_id(base, quote)
+            ask, bid = self._orderbook_top(mid)
+            px = ask if side == "buy" else bid
+            if px and px > 0:
+                return px
+            raise InjectiveError("empty order book side")
+        except Exception as e:  # noqa: BLE001 — any failure -> try fallback, else fail closed
+            if self._ref_price_env:
+                return Decimal(self._ref_price_env)
+            raise InjectiveError(f"no reference price for {base}/{quote}: {e}") from e
+
+    def _orderbook_top(self, market_id: str) -> tuple[Decimal | None, Decimal | None]:
+        """Return (best_ask, best_bid) human prices from the indexer, or (None, None)."""
+        import httpx
+
+        url = f"{_INDEXER_URL}/api/exchange/spot/v1/orderbook/{market_id}"
+        r = httpx.get(url, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+        book = data.get("orderbook", data)
+        sells = book.get("sells") or book.get("asks") or []
+        buys = book.get("buys") or book.get("bids") or []
+        ask = self._best_price(sells, want_min=True)
+        bid = self._best_price(buys, want_min=False)
+        return ask, bid
+
+    @staticmethod
+    def _best_price(levels: list[dict[str, Any]], want_min: bool) -> Decimal | None:
+        prices: list[Decimal] = []
+        for lvl in levels:
+            raw = lvl.get("price")
+            if raw is None:
+                continue
+            # Indexer returns price in API FORMAT (scaled 1e18); normalise to human.
+            prices.append(mkt.from_ufixed(int(Decimal(str(raw)))))
+        if not prices:
+            return None
+        return min(prices) if want_min else max(prices)
+
+    # ---- sizing ------------------------------------------------------------
+
+    def _size(self, base: str, quote: str, side: str, amount_usd: str,
+              slippage_bps: int) -> dict[str, Any]:
+        ref = self._ref_price(base, quote, side)
+        usd = Decimal(str(amount_usd))
+        quantity_base = usd / ref  # base units to trade
+        slip = Decimal(slippage_bps) / Decimal(10_000)
+        worst = ref * (1 + slip) if side == "buy" else ref * (1 - slip)
+        return {
+            "ref_price": float(ref),
+            "worst_price": float(worst),
+            "quantity_base": float(quantity_base),
+            "price_ufixed": mkt.to_ufixed(worst),
+            "quantity_ufixed": mkt.to_ufixed(quantity_base),
+            "amount_usd": float(usd),
+        }
+
+    # ---- ExecutionBackend --------------------------------------------------
+
+    async def get_quote(self, chain: str, from_token: str, to_token: str, amount: str,
+                        slippage_bps: int = 50) -> dict[str, Any]:
+        plan = mkt.classify_swap(from_token, to_token)
+        sizing = self._size(plan["base"], plan["quote"], plan["side"], amount, slippage_bps)
+        return {
+            "source": "injective",
+            "chain": chain or "injective",
+            "market": f"{plan['base']}/{plan['quote']}",
+            "side": plan["side"],
+            "slippage_bps": slippage_bps,
+            **sizing,
+        }
+
+    async def execute_swap(self, chain: str, from_token: str, to_token: str, amount: str,
+                           slippage_bps: int = 50) -> ExecutionResult:
+        plan = mkt.classify_swap(from_token, to_token)
+        sizing = self._size(plan["base"], plan["quote"], plan["side"], amount, slippage_bps)
+        market = mkt.market_id(plan["base"], plan["quote"])
+
+        if self.dry_run:
+            return ExecutionResult(
+                executed=False, dry_run=True,
+                detail={"source": "injective", "mode": "dry_run",
+                        "would_call": "SpotExecutor.placeSpotMarketOrder",
+                        "market": market, "order_type": plan["order_type"], **sizing},
+            )
+
+        try:
+            tx_hash, fill = self._send_order(
+                market_id=market, order_type=plan["order_type"],
+                price_ufixed=sizing["price_ufixed"], quantity_ufixed=sizing["quantity_ufixed"],
+                cid=os.environ.get("INJ_CID", ""),
+            )
+        except Exception as e:  # noqa: BLE001 — surface, let the loop fail closed
+            return ExecutionResult(executed=False, dry_run=False,
+                                   detail={"source": "injective", **sizing}, error=str(e))
+
+        return ExecutionResult(
+            executed=bool(tx_hash), dry_run=False,
+            detail={"source": "injective", "tx": tx_hash, "market": market,
+                    "order_type": plan["order_type"], **sizing, **fill},
+        )
+
+    # ---- on-chain ----------------------------------------------------------
+
+    def _contract(self):
+        from web3 import Web3
+
+        w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        abi = json.loads(_ABI_PATH.read_text())["abi"]
+        addr = w3.to_checksum_address(self.executor_addr)
+        return w3, w3.eth.contract(address=addr, abi=abi)
+
+    def _subaccount(self) -> str:
+        return mkt.subaccount_id(self.executor_addr, self.subaccount_index)
+
+    def _send_order(self, market_id: str, order_type: str, price_ufixed: int,
+                    quantity_ufixed: int, cid: str) -> tuple[str, dict[str, Any]]:
+        w3, c = self._contract()
+        acct = w3.eth.account.from_key(self._pk)
+        fn = c.functions.placeSpotMarketOrder(
+            market_id, self._subaccount(), self.fee_recipient,
+            int(price_ufixed), int(quantity_ufixed), cid, order_type,
+        )
+        tx = fn.build_transaction({
+            "from": acct.address,
+            "nonce": w3.eth.get_transaction_count(acct.address),
+            "gas": int(os.environ.get("INJ_GAS_LIMIT", "2000000")),
+            "gasPrice": w3.eth.gas_price,
+            "chainId": mkt.CHAIN_ID,
+        })
+        signed = acct.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise InjectiveError(f"order tx reverted: {tx_hash.hex()}")
+        return tx_hash.hex(), self._read_fill(c, receipt, quantity_ufixed)
+
+    @staticmethod
+    def _read_fill(contract, receipt, requested_ufixed: int) -> dict[str, Any]:
+        """Parse the actual fill from SpotMarketOrderResult. Market orders don't rest,
+        so a partial fill (filled < requested) is normal and must be observed, not assumed."""
+        fill: dict[str, Any] = {"order_hash": "", "filled_base": None,
+                                "avg_price": None, "fill_ratio": None}
+        try:
+            evs = contract.events.SpotMarketOrderResult().process_receipt(receipt)
+            if evs:
+                a = evs[0]["args"]
+                fill["order_hash"] = a.get("orderHash", "")
+                filled = float(mkt.from_ufixed(int(a.get("filledQuantity", 0))))
+                fill["filled_base"] = filled
+                fill["avg_price"] = float(mkt.from_ufixed(int(a.get("avgPrice", 0))))
+                req = float(mkt.from_ufixed(int(requested_ufixed))) or None
+                fill["fill_ratio"] = (filled / req) if req else None
+        except Exception:  # noqa: BLE001 — event decode is best-effort
+            pass
+        return fill
+
+    def read_subaccount_balances(self, symbols: list[str]) -> dict[str, float]:
+        """On-chain NAV truth: available balance per symbol in the contract's subaccount.
+        Used by the reconcile loop the same way onchain.read_token_balances is on BSC."""
+        _w3, c = self._contract()
+        sub = self._subaccount()
+        out: dict[str, float] = {}
+        for sym in symbols:
+            denom, decimals = mkt.token(sym)
+            available, _total = c.functions.subaccountBalance(sub, denom).call()
+            out[sym.upper()] = float(mkt.from_chain_amount(int(available), decimals))
+        return out

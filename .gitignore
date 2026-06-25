@@ -17,3 +17,9 @@ heartbeat.txt
 STOP
 # committed for the demo so a fresh clone shows the dashboard + passes `verify`:
 # receipts.jsonl, sim_equity.jsonl, abstentions.jsonl, x402_receipts.jsonl
+
+# Injective Foundry build artifacts + secret deploy env
+contracts/injective/out/
+contracts/injective/cache/
+contracts/injective/.deploy.env
+contracts/injective/.testnet_wallet.json
