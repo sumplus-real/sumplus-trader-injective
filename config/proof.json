@@ -1,13 +1,11 @@
 {
-  "_comment": "On-chain facts, filled in by Jakob's hands: the registered agent wallet, the ERC-8004 identity id, and the commit-reveal transaction hash. policy_hash is recomputed live from config/strategy.json by the dashboard, so it is always current.",
-  "agent_id": "sumplus-trader-bnb",
-  "agent_wallet": "0xaFf9e1C61dEA470060894f396227fabF8Bfa3157",
-  "erc8004_id": "56:0x8004a169fb4a3325136eb29fa0ceb6d2e539a432:139543",
-  "commit_tx": "0x0948d1ff639acc1725ecc369f68629bab0cb83b96f0a0f6fd36f24034d89d621",
-  "compete_register_tx": "0xe048cd9747c8ac918608e7e51cdaddc17d50bb26837c3b2968a5e6bd6960aaa7",
-  "policy_commitment": "sumplus.policy/v1 sha256:fb0d30ef0f7d31b868055a51ca651a39fd03736e9f4d597150614686a6bdb65a",
-  "explorer": "https://bscscan.com",
-  "chain": "BSC",
-  "window": "live PnL window 6/22-28 UTC",
-  "repo_url": "https://github.com/sumplus-real/sumplus-trader-bnb"
+  "_comment": "On-chain facts for the Injective deployment. policy_hash is recomputed live from the committed strategy config by the dashboard, so it is always current. agent_wallet is the EOA that published the commit-reveal and signs the SpotExecutor calls on Injective.",
+  "agent_id": "sumplus-trader-injective",
+  "agent_wallet": "0x9CAABE20E915eA99dCc3414e9bb84Bb3F52a2F0d",
+  "commit_tx": "0xa3c8707bf53621eb98a5f5d616b3c708b1a9434ca74ee2328fbfd8eb31b53484",
+  "policy_commitment": "sumplus.policy/v1 sha256:59991a59d3ffdc77948313df6ab495cc4124bc027f10fa1b8044fb9313efc83b",
+  "explorer": "https://testnet.blockscout.injective.network",
+  "chain": "Injective EVM testnet (1439)",
+  "window": "Injective testnet demo run",
+  "repo_url": "https://github.com/sumplus-real/sumplus-trader-injective"
 }

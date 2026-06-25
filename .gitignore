@@ -26,3 +26,6 @@ contracts/injective/.testnet_wallet.json
 
 # Injective demo run artifacts (local)
 .demo_injective/
+
+# keep the committed Injective demo NAV curve (the general live_equity ignore above still protects real runs)
+!demo/injective/live_equity.jsonl

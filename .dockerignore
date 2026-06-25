@@ -15,3 +15,6 @@ live.pid
 heartbeat.txt
 STOP
 backup_pretest_*/
+
+# keep the committed Injective demo NAV curve for the read-only display image
+!demo/injective/live_equity.jsonl
