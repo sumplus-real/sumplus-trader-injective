@@ -17,7 +17,7 @@ class Executor:
         self.mode = mode
         self.slippage_bps = default_slippage_bps
 
-    async def execute(self, decision: Decision, amount_usd: float) -> ExecutionResult:
+    async def execute(self, decision: Decision, amount_usd: float, cid: str = "") -> ExecutionResult:
         amount = f"{amount_usd:g}"
         if self.mode == "paper":
             quote = await self.backend.get_quote(
@@ -26,7 +26,10 @@ class Executor:
             )
             return ExecutionResult(executed=False, dry_run=True, detail={"mode": "paper", "quote": quote})
 
+        # cid binds the on-chain order back to the committed receipt. Only backends that put it on
+        # chain (Injective) declare accepts_cid; everyone else keeps the original signature.
+        extra = {"cid": cid} if (cid and getattr(self.backend, "accepts_cid", False)) else {}
         return await self.backend.execute_swap(
             chain=decision.chain, from_token=decision.from_token,
-            to_token=decision.to_token, amount=amount, slippage_bps=self.slippage_bps,
+            to_token=decision.to_token, amount=amount, slippage_bps=self.slippage_bps, **extra,
         )

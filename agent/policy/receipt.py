@@ -24,6 +24,19 @@ from agent.ops.paths import data_path
 GENESIS = "sha256:" + "0" * 64
 RECEIPTS_PATH = data_path("receipts.jsonl")
 
+# The on-chain order carries a client order id (cid) that points back to the exact receipt that
+# authorised it. Injective caps the cid length, so we take the leading hex of the receipt hash:
+# 32 hex = 128-bit binding, safely under the cap. The full receipt hash stays in the execution log,
+# so the bind is recoverable both ways (cid -> receipt prefix, execution record -> full hash).
+CID_HEX_LEN = 32
+
+
+def receipt_cid(receipt_hash: str) -> str:
+    """Derive the on-chain cid from a receipt hash. Binds the objective on-chain fill back to the
+    committed decision: change the decision and its receipt hash changes, so the cid no longer
+    matches the order the chain recorded."""
+    return receipt_hash.split(":", 1)[-1][:CID_HEX_LEN]
+
 
 @dataclass
 class Receipt:

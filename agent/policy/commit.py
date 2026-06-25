@@ -16,6 +16,7 @@ from typing import Any
 
 from agent.policy.canonical import committed_policy_hash, load_config
 from agent.policy.receipt import ReceiptChain, verify_chain
+from agent.policy import execlog
 
 PROOF_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "proof.json"
 
@@ -36,18 +37,33 @@ def build_commitment(*, agent_id: str, repo_url: str = "") -> dict[str, Any]:
     }
 
 
-def verify_live(receipts_path: Path | str | None = None) -> dict[str, Any]:
-    """Public verifier: recompute the committed hash and check the receipt chain against it."""
+def verify_live(receipts_path: Path | str | None = None,
+                executions_path: Path | str | None = None) -> dict[str, Any]:
+    """Public verifier: recompute the committed hash, check the receipt chain against it, and bind
+    every logged on-chain order back to the committed decision it came from.
+
+    Three checks, all recomputable from the public repo + logs:
+      1. chain_intact            — the receipt hash chain is unbroken (no past decision rewritten).
+      2. all_reference_committed — every receipt carries the committed policy hash.
+      3. executions_bound        — every executed order's cid is the receipt hash prefix, and that
+                                   receipt is a trade the policy allowed."""
     expected = committed_policy_hash()
     chain = ReceiptChain(receipts_path) if receipts_path else ReceiptChain()
     records = chain.read_all()
     result = verify_chain(records, expected_policy_hash=expected)
+
+    execs = execlog.read_all(executions_path) if executions_path else execlog.read_all()
+    exec_result = execlog.verify_executions(execs, records)
+
     return {
         "committed_policy_hash": expected,
         "receipts": result.get("count", 0),
         "chain_intact": result.get("ok", False),
         "all_reference_committed_hash": result.get("policy_ok", False),
         "broken_at": result.get("broken_at"),
+        "executions": exec_result.get("count", 0),
+        "executions_bound": exec_result.get("ok", False),
+        "executions_bad": exec_result.get("bad", []),
     }
 
 

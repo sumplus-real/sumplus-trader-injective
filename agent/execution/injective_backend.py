@@ -49,6 +49,10 @@ class InjectiveError(Exception):
 
 
 class InjectiveBackend(ExecutionBackend):
+    # The agent's receipt hash rides along as the order cid, so the on-chain order is bound to the
+    # exact committed decision. The Executor only forwards a cid to backends that opt in here.
+    accepts_cid = True
+
     def __init__(self, dry_run: Optional[bool] = None, default_subaccount_index: int = 1):
         self.rpc_url = os.environ.get("INJ_RPC", "")
         self.executor_addr = os.environ.get("INJ_EXECUTOR_ADDRESS", "")
@@ -145,17 +149,20 @@ class InjectiveBackend(ExecutionBackend):
         }
 
     async def execute_swap(self, chain: str, from_token: str, to_token: str, amount: str,
-                           slippage_bps: int = 50) -> ExecutionResult:
+                           slippage_bps: int = 50, cid: str = "") -> ExecutionResult:
         plan = mkt.classify_swap(from_token, to_token)
         sizing = self._size(plan["base"], plan["quote"], plan["side"], amount, slippage_bps)
         market = mkt.market_id(plan["base"], plan["quote"])
+        # The committed receipt hash (passed by core.tick) is the cid we put on chain; fall back to
+        # a static env only for standalone/manual sends.
+        order_cid = cid or os.environ.get("INJ_CID", "")
 
         # Skip orders below the market's min notional (they revert on-chain). The loop holds.
         if sizing["amount_usd"] < mkt.MIN_NOTIONAL_USD:
             return ExecutionResult(
                 executed=False, dry_run=self.dry_run,
                 detail={"source": "injective", "skipped": "below_min_notional",
-                        "min_notional_usd": mkt.MIN_NOTIONAL_USD, **sizing},
+                        "min_notional_usd": mkt.MIN_NOTIONAL_USD, "cid": order_cid, **sizing},
             )
 
         if self.dry_run:
@@ -163,18 +170,20 @@ class InjectiveBackend(ExecutionBackend):
                 executed=False, dry_run=True,
                 detail={"source": "injective", "mode": "dry_run",
                         "would_call": "SpotExecutor.placeSpotMarketOrder",
-                        "market": market, "order_type": plan["order_type"], **sizing},
+                        "market": market, "order_type": plan["order_type"],
+                        "cid": order_cid, **sizing},
             )
 
         try:
             tx_hash, order_hash = self._send_order(
                 market_id=market, order_type=plan["order_type"],
                 price_ufixed=sizing["price_ufixed"], quantity_ufixed=sizing["quantity_ufixed"],
-                cid=os.environ.get("INJ_CID", ""),
+                cid=order_cid,
             )
         except Exception as e:  # noqa: BLE001 — surface, let the loop fail closed
             return ExecutionResult(executed=False, dry_run=False,
-                                   detail={"source": "injective", **sizing}, error=str(e))
+                                   detail={"source": "injective", "cid": order_cid, **sizing},
+                                   error=str(e))
 
         # Injective matches spot orders in a batch at end-of-block, so the order is placed here but
         # the fill lands in the subaccount after the block. We report the placement (tx + orderHash);
@@ -183,7 +192,7 @@ class InjectiveBackend(ExecutionBackend):
             executed=bool(tx_hash), dry_run=False,
             detail={"source": "injective", "tx": tx_hash, "order_hash": order_hash,
                     "market": market, "order_type": plan["order_type"],
-                    "fill": "via_reconcile", **sizing},
+                    "cid": order_cid, "fill": "via_reconcile", **sizing},
         )
 
     # ---- on-chain ----------------------------------------------------------

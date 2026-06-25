@@ -18,7 +18,8 @@ from typing import Any, Optional
 
 from agent.policy.canonical import committed_policy_hash, digest, load_config
 from agent.policy.engine import PolicyEngine, PortfolioView, MarketView
-from agent.policy.receipt import ReceiptChain
+from agent.policy.receipt import ReceiptChain, receipt_cid
+from agent.policy import execlog
 from agent.abstention.ledger import AbstentionLedger
 from agent.strategy import survival
 from agent.strategy.signals import rank_entries
@@ -127,6 +128,9 @@ async def tick(*, state: dict, executor: Optional[Executor] = None, cfg: Optiona
     receipt = chain.append(policy_hash=ph, kind=pv.kind, decision=decision.to_dict(),
                            verdict=("hold" if pv.kind == "hold" else pv.action),
                            reason=pv.reason, inputs_digest=inputs_digest, ts=_iso(now_ts))
+    # The receipt commits the decision; its hash prefix becomes the on-chain order cid, so the
+    # order Helix records is bound back to this exact receipt.
+    cid = receipt_cid(receipt.hash)
 
     result = TickResult(intent_action=intent.action, decision=decision.to_dict(),
                         verdict=pv.action, reason=pv.reason, ladder_rung=pv.ladder_rung,
@@ -171,6 +175,7 @@ async def tick(*, state: dict, executor: Optional[Executor] = None, cfg: Optiona
     new_state["pending_intent"] = None
     if pv.allowed and decision.is_trade():
         amount = pv.final_amount_usd
+        exec_res = None
         if executor is not None and executor.mode not in ("mock", "paper"):
             # Durably mark the intent BEFORE broadcasting, so a crash mid-swap is recoverable
             # (the restart reconciles from chain instead of re-firing this same trade).
@@ -183,13 +188,24 @@ async def tick(*, state: dict, executor: Optional[Executor] = None, cfg: Optiona
                 staged["pending_intent"] = pending
                 persist(staged)
             new_state["intent_seq"] = seq
-            exec_res = await executor.execute(decision, amount)
+            exec_res = await executor.execute(decision, amount, cid=cid)
             result.executed = bool(exec_res.executed)
         elif executor is not None:
-            exec_res = await executor.execute(decision, amount)
+            exec_res = await executor.execute(decision, amount, cid=cid)
             result.executed = bool(exec_res.executed) or executor.mode in ("mock", "paper")
         else:
             result.executed = True  # simulated fill
+
+        # Bind the on-chain order back to this receipt. We log Injective orders (the verifiable
+        # artifact): cid == receipt_cid(receipt.hash), and tx/order_hash are the objective records
+        # anyone can cross-check on the explorer. Bookkeeping must never break the trading loop.
+        if exec_res is not None and (exec_res.detail or {}).get("source") == "injective":
+            try:
+                execlog.record_execution(
+                    receipt_seq=receipt.seq, receipt_hash=receipt.hash, cid=cid, ts=_iso(now_ts),
+                    executed=bool(exec_res.executed), detail=exec_res.detail, error=exec_res.error)
+            except Exception as e:  # noqa: BLE001
+                print(f"[execlog] append failed (non-fatal): {e}")
 
         if result.executed:
             _apply_fill(new_state, decision, amount, price, now_ts)
