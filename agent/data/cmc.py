@@ -28,6 +28,7 @@ _MOCK_SCENARIO: dict[str, dict[str, float]] = {
     "BTCB": {"price": 68000.0, "pct_1h": 0.3, "pct_4h": -0.2, "vol_24h_pct": 1.8},
     "ETH":  {"price": 3550.0, "pct_1h": -1.4, "pct_4h": 2.1, "vol_24h_pct": 5.6},
     "CAKE": {"price": 2.35, "pct_1h": 0.5, "pct_4h": 0.9, "vol_24h_pct": 3.2},
+    "INJ":  {"price": 20.0, "pct_1h": 0.9, "pct_4h": 1.7, "vol_24h_pct": 2.5},
     "USDT": {"price": 1.0, "pct_1h": 0.0, "pct_4h": 0.0, "vol_24h_pct": 0.1},
     "USDC": {"price": 1.0, "pct_1h": 0.0, "pct_4h": 0.0, "vol_24h_pct": 0.1},
 }

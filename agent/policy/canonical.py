@@ -16,10 +16,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "strategy.json"
+# The active strategy config. Defaults to the BNB committed config; a deployment can point at its
+# own config (e.g. the Injective profile) via STRATEGY_CONFIG so its receipts reference the hash of
+# the config it actually ran. Same canonicalisation rule, so anyone can recompute either hash.
+_DEFAULT_CONFIG = Path(__file__).resolve().parent.parent.parent / "config" / "strategy.json"
+CONFIG_PATH = Path(os.environ.get("STRATEGY_CONFIG", _DEFAULT_CONFIG))
 
 
 def strip_comments(obj: Any) -> Any:

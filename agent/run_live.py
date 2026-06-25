@@ -50,6 +50,37 @@ def _rpc_pool() -> RpcPool:
     return RpcPool(endpoints)
 
 
+def sync_state_from_injective(state: dict, backend, price: dict, cfg: dict) -> bool:
+    """Injective reconcile: chain truth is the SpotExecutor subaccount, not ERC-20 wallet balances.
+    Reads available USDT + INJ from the subaccount and overwrites positions/stable cash. Fail-closed
+    (returns False → hold) if the read fails, same contract as the BSC path."""
+    symbols = list(cfg.get("universe", [])) + list(cfg.get("quote_tokens", []))
+    try:
+        bals = backend.read_subaccount_balances(symbols)
+    except Exception as e:  # noqa: BLE001 — any read failure means we cannot trust state → hold
+        print(f"[reconcile/injective] subaccount read failed, holding this tick: {e}")
+        return False
+
+    stables = {s.upper() for s in cfg.get("quote_tokens", ["USDT"])}
+    stable_usd = sum(bals.get(s, 0.0) * (price.get(s) or 1.0) for s in stables)
+    old = state.get("positions") or {}
+    positions: dict = {}
+    for sym, qty in bals.items():
+        if sym in stables:
+            continue
+        if qty * (price.get(sym) or 0.0) < DUST_USD:
+            continue
+        if sym in old:
+            positions[sym] = {"qty": qty, "entry_price": float(old[sym]["entry_price"]),
+                              "entry_ts": float(old[sym]["entry_ts"])}
+        else:
+            positions[sym] = {"qty": qty, "entry_price": float(price.get(sym) or 0.0),
+                              "entry_ts": time.time()}
+    state["positions"] = positions
+    state["stable_usd"] = stable_usd
+    return True
+
+
 def sync_state_from_chain(state: dict, rpc: RpcPool, wallet: str, price: dict, cfg: dict) -> bool:
     """Overwrite positions + stable cash from real on-chain balances. Returns False (fail-closed)
     if the chain can't be read, so the caller holds instead of trading against a guessed balance."""
@@ -108,7 +139,8 @@ def _append_equity_point(state: dict, result) -> None:
 async def _loop_once_forever() -> None:
     cfg = load_config()
     chosen = os.environ.get("EXECUTION_BACKEND", "").lower()
-    exec_mode = "live" if chosen in ("twak", "maria") else "mock"
+    is_injective = chosen == "injective"
+    exec_mode = "live" if chosen in ("twak", "maria", "injective") else "mock"
     backend = make_backend(exec_mode)
     execu = Executor(backend, mode=exec_mode,
                      default_slippage_bps=cfg["risk"]["default_slippage_bps"])
@@ -117,7 +149,10 @@ async def _loop_once_forever() -> None:
     state["mode"] = exec_mode
 
     wallet = os.environ.get("AGENT_WALLET_ADDRESS", "")
-    rpc = _rpc_pool() if exec_mode == "live" and wallet else None
+    # Injective reconciles from the SpotExecutor subaccount (via the backend), not an RPC pool.
+    # The backend stays in dry-run until RPC+contract+key are set; only read chain when truly live.
+    inj_reconcile = is_injective and not getattr(backend, "dry_run", True)
+    rpc = _rpc_pool() if exec_mode == "live" and wallet and not is_injective else None
     seed_nav = float(os.environ.get("START_NAV", "500"))
     if not state.get("high_water_mark"):
         state["high_water_mark"] = seed_nav
@@ -130,7 +165,12 @@ async def _loop_once_forever() -> None:
             price = {v.symbol.upper(): v.price for v in views}
 
             # 1) Reconcile internal ledger to chain truth (fail-closed: hold if chain unreadable).
-            if rpc is not None:
+            if inj_reconcile:
+                if not sync_state_from_injective(state, backend, price, cfg):
+                    ps.write(state)
+                    await asyncio.sleep(interval)
+                    continue
+            elif rpc is not None:
                 if not sync_state_from_chain(state, rpc, wallet, price, cfg):
                     ps.write(state)
                     await asyncio.sleep(interval)

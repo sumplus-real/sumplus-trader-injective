@@ -1,0 +1,86 @@
+{
+  "_comment": "CANONICAL COMMITTED POLICY for the Injective deployment. Its SHA-256 (over this file, canonicalised: sorted keys, no whitespace, keys starting with _ stripped) is published to the agent's identity BEFORE code-lock; every live decision receipt references that hash. Injective Nova: spot trading on Helix (Exchange precompile 0x65) via the SpotExecutor contract. Same survival-first strategy as the BNB deployment, retuned for the INJ/USDT universe and testnet sizes. Each deployment commits its own config.",
+  "version": "injective-1.0.0",
+
+  "mode": "paper",
+
+  "chains": {
+    "injective": { "chain_id": 1439, "enabled": true }
+  },
+
+  "universe": ["INJ"],
+  "quote_tokens": ["USDT"],
+  "allowed_tokens": ["USDT", "INJ"],
+  "allowed_pairs": [
+    { "chain": "injective", "from": "USDT", "to": "INJ" },
+    { "chain": "injective", "from": "INJ", "to": "USDT" }
+  ],
+
+  "trending": {
+    "enabled": false,
+    "max_extra_tokens": 0,
+    "min_liquidity_usd": 2000000,
+    "max_spread_bps": 80,
+    "_comment": "Single-asset INJ/USDT universe for the testnet integration; trending admission off."
+  },
+
+  "signal": {
+    "momentum_lookbacks_h": [1, 4],
+    "require_momentum_agreement": true,
+    "vol_enter_max_pct": 4.0,
+    "vol_window_h": 24,
+    "_comment": "Take risk only when 1h and 4h momentum agree in sign AND realized vol < vol_enter_max."
+  },
+
+  "risk": {
+    "max_single_trade_pct": 0.025,
+    "min_single_trade_pct": 0.01,
+    "max_single_trade_usd": 2,
+    "max_position_pct": 0.40,
+    "max_risky_exposure_pct": 0.12,
+    "max_trades_per_hour": 4,
+    "min_trade_interval_seconds": 900,
+    "default_slippage_bps": 50,
+    "max_slippage_bps": 120,
+    "stop_loss_pct": 2.0,
+    "take_profit_pct": 4.0,
+    "max_hold_hours": 48,
+    "max_drawdown_pct": 6.0,
+    "_comment": "max_drawdown_pct is the survival gate. Risky exposure capped low (12%) so even a deep INJ crash stays inside the gate; the ladder de-risks earlier. Absolute trade caps sized small for the testnet subaccount."
+  },
+
+  "drawdown_ladder": [
+    { "at_pct": 1.0, "action": "halve_size" },
+    { "at_pct": 2.0, "action": "no_new_risk" },
+    { "at_pct": 3.0, "action": "stablecoin_mode" }
+  ],
+  "internal_hard_kill_pct": 3.0,
+
+  "min_trades": {
+    "target_count_per_week": 12,
+    "micro_rebalance_usd": 1,
+    "target_risky_ratio": 0.10,
+    "rebalance_band": 0.04,
+    "_comment": "Scheduled tiny in-policy rebalances guarantee the minimum qualifying trade count without overtrading."
+  },
+
+  "data": {
+    "source": "cmc_mcp",
+    "max_data_age_seconds": 600,
+    "x402_receipts": true,
+    "_comment": "CMC MCP is the only market-data source; stale data (age > max_data_age_seconds) blocks trading."
+  },
+
+  "ops": {
+    "rpc_endpoints": [
+      "https://k8s.testnet.json-rpc.injective.network/"
+    ],
+    "reconcile_interval_seconds": 1800,
+    "heartbeat_seconds": 120,
+    "fail_closed": true
+  },
+
+  "loop": {
+    "tick_seconds": 1800
+  }
+}

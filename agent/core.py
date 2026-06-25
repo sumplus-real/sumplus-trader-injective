@@ -108,8 +108,9 @@ async def tick(*, state: dict, executor: Optional[Executor] = None, cfg: Optiona
     data_age = max(0.0, now_ts - data_ts)
 
     pstate = build_portfolio_state(state, views, cfg)
+    trade_chain = next((c for c, v in cfg.get("chains", {}).items() if v.get("enabled")), "bsc")
     intent = survival.decide(views, pstate, cfg, now_ts,
-                             quote=cfg.get("quote_tokens", ["USDT"])[0])
+                             quote=cfg.get("quote_tokens", ["USDT"])[0], chain=trade_chain)
     decision = _intent_to_decision(intent)
 
     regime = "risk_on" if rank_entries(views, cfg.get("signal", {})) else "risk_off"
