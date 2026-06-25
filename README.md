@@ -1,5 +1,14 @@
 # Sumplus Trader
 
+> **Injective Nova submission — you are on the `injective` branch.**
+> This branch ports the verifiable-decision core to Injective EVM and the Helix on-chain order book.
+> Every decision the agent makes is bound to an on-chain Helix order anyone can verify against a
+> policy committed before trading started. Start here: **[`docs/INJECTIVE_DEMO.md`](docs/INJECTIVE_DEMO.md)**.
+> The verified testnet artifacts (14 hash-chained receipts, 2 cid-bound orders) live in
+> [`demo/injective/`](demo/injective/). On-chain proof (chain 1439): commit `a3c8707b…`,
+> bound BUY `d31ba264…`, bound SELL `107d6935…`.
+> The README below describes the original BNB build, which the Injective version is built on.
+
 A self-custody AI trader on BSC that can show its work. It runs unattended for a week, and when
 the week is over anyone can check that it never broke its own rules. Built for the BNB Hack: AI
 Trading Agent Edition.
