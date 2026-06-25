@@ -96,6 +96,18 @@ export SUMPLUS_DATA_DIR="$PWD/.demo_injective"   # isolate this run's receipt ch
    **On-chain bound orders** panel lists each Helix order with its `cid == receipt` badge and an
    explorer link. Click any receipt in the decision feed to replay its hash deterministically.
 
+## One-command recording
+
+`tools/inj_demo_record.sh` is a read-only, no-key walkthrough for the screen recording: it opens the
+dashboard, then narrates the commit hash, `verify_live`, the cid==receipt bindings, and a live
+on-chain cross-check, with captions and pauses so no voiceover or clicking is needed. It reads the
+committed artifacts in `demo/injective/` (a real testnet run, see `demo/injective/README.md`), so it
+works on a fresh clone:
+
+```sh
+bash tools/inj_demo_record.sh   # ~2.5 min, self-paced
+```
+
 ## Why the agent only trades ~1 USD at a time
 
 The testnet subaccount holds a small NAV, and the committed config caps risky exposure at 20% with a
