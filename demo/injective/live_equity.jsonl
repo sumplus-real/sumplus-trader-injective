@@ -1,0 +1,14 @@
+{"ts": 1782380146.77183, "nav": 5.9928, "drawdown_pct": 0.0, "risky_exposure_pct": 20.02, "regime": "risk_on", "action": "buy", "verdict": "clamp", "rung": "none"}
+{"ts": 1782380161.743149, "nav": 6.0622, "drawdown_pct": 0.0, "risky_exposure_pct": 20.98, "regime": "risk_on", "action": "sell", "verdict": "reject", "rung": "none"}
+{"ts": 1782380250.993183, "nav": 5.9902, "drawdown_pct": 1.19, "risky_exposure_pct": 20.03, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380343.712467, "nav": 5.995, "drawdown_pct": 1.11, "risky_exposure_pct": 20.1, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380436.591691, "nav": 5.9998, "drawdown_pct": 1.03, "risky_exposure_pct": 20.16, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380529.24996, "nav": 6.0046, "drawdown_pct": 0.95, "risky_exposure_pct": 20.22, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380621.963006, "nav": 6.0094, "drawdown_pct": 0.87, "risky_exposure_pct": 20.29, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380714.664141, "nav": 6.0142, "drawdown_pct": 0.79, "risky_exposure_pct": 20.35, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380807.6413949, "nav": 6.019, "drawdown_pct": 0.71, "risky_exposure_pct": 20.42, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380900.339811, "nav": 6.0238, "drawdown_pct": 0.63, "risky_exposure_pct": 20.48, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782380992.923522, "nav": 6.0286, "drawdown_pct": 0.55, "risky_exposure_pct": 20.54, "regime": "risk_on", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782381093.13556, "nav": 6.0334, "drawdown_pct": 0.48, "risky_exposure_pct": 0.72, "regime": "risk_on", "action": "sell", "verdict": "allow", "rung": "none"}
+{"ts": 1782381185.842422, "nav": 5.9836, "drawdown_pct": 1.3, "risky_exposure_pct": 0.0, "regime": "neutral", "action": "hold", "verdict": "allow", "rung": "none"}
+{"ts": 1782381278.77893, "nav": 5.9836, "drawdown_pct": 1.3, "risky_exposure_pct": 0.0, "regime": "neutral", "action": "hold", "verdict": "allow", "rung": "none"}

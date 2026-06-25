@@ -1,12 +1,21 @@
-# Render Blueprint — one-click deploy of the verifiable-trading dashboard.
-# Connect this public repo in the Render dashboard (New > Blueprint) and it builds
-# the Dockerfile, injects $PORT, and serves the dashboard at a public URL.
-# Committed demo data renders immediately; live receipts append into the same URL.
+# Render Blueprint — one-click deploy of the read-only verifiable-trading dashboard.
+# Connect this public repo in the Render dashboard (New > Blueprint). It builds the
+# Dockerfile and serves the dashboard at a public URL, rendering the committed
+# Injective testnet demo data (demo/injective) with no keys and no live loop.
 services:
   - type: web
-    name: sumplus-trader-bnb
+    name: sumplus-trader-injective
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /
     autoDeploy: true
+    envVars:
+      - key: SUMPLUS_DATA_DIR
+        value: /app/demo/injective
+      - key: EXECUTION_BACKEND
+        value: injective
+      - key: STRATEGY_CONFIG
+        value: /app/config/strategy.injective.json
+      - key: INJ_EXPLORER_TX
+        value: https://testnet.blockscout.injective.network/tx/
