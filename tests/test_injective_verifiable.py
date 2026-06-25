@@ -9,8 +9,11 @@ These cover the new P2 wiring without any network:
 """
 import asyncio
 
+from decimal import Decimal
+
 from agent.execution.executor import Executor
 from agent.execution.injective_backend import InjectiveBackend
+from agent.ops import injective_market as mkt
 from agent.policy.receipt import ReceiptChain, receipt_cid, CID_HEX_LEN
 from agent.policy import execlog
 from agent.types import Decision, ExecutionResult
@@ -108,6 +111,18 @@ def test_execution_log_binds_to_receipt_and_detects_tampering(tmp_path):
         [{"receipt_seq": h.seq, "receipt_hash": h.hash, "cid": receipt_cid(h.hash),
           "executed": True}], ch.read_all())
     assert not held["ok"] and not held["receipt_ok"]
+
+
+def test_snap_to_tick_respects_market_ticks():
+    # Helix rejects price/quantity that is not a whole multiple of the tick. A buy's worst price
+    # rounds up (still an acceptable cap), a sell's rounds down, quantity floors.
+    tick = Decimal("0.001")
+    assert mkt.snap_to_tick("19.8005", tick, "up") == Decimal("19.801")
+    assert mkt.snap_to_tick("19.8005", tick, "down") == Decimal("19.800")
+    assert mkt.snap_to_tick("0.06030150753", tick, "down") == Decimal("0.060")
+    # already aligned values are unchanged; a zero/negative tick is a no-op
+    assert mkt.snap_to_tick("19.800", tick, "up") == Decimal("19.800")
+    assert mkt.snap_to_tick("19.8005", Decimal("0"), "down") == Decimal("19.8005")
 
 
 def test_injective_commit_hashes_injective_config():

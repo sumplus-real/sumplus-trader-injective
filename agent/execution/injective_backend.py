@@ -124,13 +124,27 @@ class InjectiveBackend(ExecutionBackend):
         quantity_base = usd / ref  # base units to trade
         slip = Decimal(slippage_bps) / Decimal(10_000)
         worst = ref * (1 + slip) if side == "buy" else ref * (1 - slip)
+
+        # Helix rejects any price/quantity that is not a whole multiple of the market's tick sizes.
+        # Snap before sending: a buy's worst price rounds up (still an acceptable cap), a sell's
+        # rounds down; quantity floors so it never exceeds the sized amount. Best-effort: if the
+        # tick sizes can't be fetched we send the raw values (same behaviour as before).
+        try:
+            price_tick, qty_tick = mkt.market_ticks(base, quote)
+            worst = mkt.snap_to_tick(worst, price_tick, "up" if side == "buy" else "down")
+            quantity_base = mkt.snap_to_tick(quantity_base, qty_tick, "down")
+        except Exception as e:  # noqa: BLE001 — tick lookup is best-effort
+            print(f"[injective] tick snap skipped ({e})")
+
+        # Re-derive the notional from the snapped quantity so the min-notional guard is honest.
+        amount_usd_eff = Decimal(str(quantity_base)) * ref
         return {
             "ref_price": float(ref),
             "worst_price": float(worst),
             "quantity_base": float(quantity_base),
             "price_ufixed": mkt.to_ufixed(worst),
             "quantity_ufixed": mkt.to_ufixed(quantity_base),
-            "amount_usd": float(usd),
+            "amount_usd": float(amount_usd_eff),
         }
 
     # ---- ExecutionBackend --------------------------------------------------

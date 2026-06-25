@@ -18,7 +18,7 @@ testnet, set INJ_SPOT_MARKET_INJ_USDT / INJ_DENOM_USDT from
 from __future__ import annotations
 
 import os
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 from typing import Any
 
 CHAIN_ID = int(os.environ.get("INJ_CHAIN_ID", "1776"))  # Injective native EVM mainnet
@@ -98,6 +98,65 @@ def market_id(base: str, quote: str) -> str:
             f"(find it via `injectived q exchange spot-markets`)"
         )
     return mid
+
+
+_DEFAULT_INDEXER = "https://sentry.exchange.grpc-web.injective.network"
+# Helix rejects any order whose price/quantity is not a whole multiple of the market's tick sizes,
+# so we snap before sending. Ticks differ per market and per net; fetched from the indexer once and
+# cached, with an env override for offline/locked runs. Human units (not chain-scaled).
+_TICK_CACHE: dict[str, tuple[Decimal, Decimal]] = {}
+
+
+def _indexer() -> str:
+    return os.environ.get("INJ_INDEXER_URL", _DEFAULT_INDEXER).rstrip("/")
+
+
+def market_ticks(base: str, quote: str) -> tuple[Decimal, Decimal]:
+    """(price_tick, quantity_tick) in HUMAN units for the base/quote market.
+
+    Env override wins (INJ_PRICE_TICK_<B>_<Q> / INJ_QTY_TICK_<B>_<Q>); otherwise read the market's
+    minPriceTickSize / minQuantityTickSize from the indexer and convert chain->human. The indexer
+    reports price in chain format (scaled 10^(quoteDec-baseDec)) and quantity in raw base units."""
+    pair = f"{base.upper()}/{quote.upper()}"
+    env_p = os.environ.get(f"INJ_PRICE_TICK_{base.upper()}_{quote.upper()}")
+    env_q = os.environ.get(f"INJ_QTY_TICK_{base.upper()}_{quote.upper()}")
+    if env_p and env_q:
+        return Decimal(env_p), Decimal(env_q)
+    if pair in _TICK_CACHE:
+        return _TICK_CACHE[pair]
+
+    import httpx
+
+    _bd, base_dec = token(base)
+    _qd, quote_dec = token(quote)
+    mid = market_id(base, quote)
+    last: Exception | None = None
+    for ver in ("v2", "v1"):
+        try:
+            r = httpx.get(f"{_indexer()}/api/exchange/spot/{ver}/markets/{mid}", timeout=15)
+            r.raise_for_status()
+            m = r.json().get("market", {})
+            price_tick = Decimal(str(m["minPriceTickSize"])) * (Decimal(10) ** (base_dec - quote_dec))
+            qty_tick = Decimal(str(m["minQuantityTickSize"])) / (Decimal(10) ** base_dec)
+            _TICK_CACHE[pair] = (price_tick, qty_tick)
+            return price_tick, qty_tick
+        except Exception as e:  # noqa: BLE001 — try the other indexer version, else fall back
+            last = e
+    if env_p or env_q:  # partial override as a last resort
+        return Decimal(env_p or "0"), Decimal(env_q or "0")
+    raise KeyError(f"could not resolve tick sizes for {pair}: {last}")
+
+
+def snap_to_tick(value: float | str | Decimal, tick: Decimal, mode: str) -> Decimal:
+    """Round value to a whole multiple of tick. mode: 'down' (floor) or 'up' (ceil). A buy's worst
+    price rounds up (still an acceptable upper bound), a sell's rounds down; quantity rounds down so
+    it never exceeds the sized amount."""
+    v = Decimal(str(value))
+    if tick is None or tick <= 0:
+        return v
+    n = v / tick
+    k = n.to_integral_value(rounding=ROUND_CEILING if mode == "up" else ROUND_FLOOR)
+    return k * tick
 
 
 def classify_swap(from_token: str, to_token: str) -> dict[str, Any]:
