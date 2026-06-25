@@ -1,0 +1,25 @@
+# Read-only public dashboard for the Injective Nova submission.
+# Self-contained: the Injective wiring is baked in as ENV, so any platform (Render, Railway,
+# Fly, plain `docker run`) serves the verifiable dashboard with zero configuration and no keys.
+# It renders the committed testnet demo data in demo/injective: the NAV curve, the decision feed,
+# and the on-chain bound-orders panel. No wallet, no live loop, nothing to send on chain.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Platforms inject $PORT; default to 8800 for local `docker run`.
+# The rest points the dashboard at the committed Injective testnet artifacts.
+ENV PORT=8800 \
+    SUMPLUS_DATA_DIR=/app/demo/injective \
+    EXECUTION_BACKEND=injective \
+    STRATEGY_CONFIG=/app/config/strategy.injective.json \
+    INJ_EXPLORER_TX=https://testnet.blockscout.injective.network/tx/
+
+EXPOSE 8800
+
+CMD ["sh", "-c", "uvicorn agent.web:app --host 0.0.0.0 --port ${PORT:-8800}"]
