@@ -30,12 +30,64 @@ app = FastAPI(title="Sumplus Trader — verifiable autonomous trading")
 
 
 def _cfg() -> dict[str, Any]:
-    return json.loads((ROOT / "config" / "strategy.json").read_text())
+    # Honor the deployment's committed config (STRATEGY_CONFIG) so the dashboard reflects the
+    # universe/caps/hash the running agent actually obeys; default to the BNB strategy.
+    path = os.environ.get("STRATEGY_CONFIG") or str(ROOT / "config" / "strategy.json")
+    p = Path(path)
+    if not p.is_absolute():
+        p = ROOT / path
+    return json.loads(p.read_text())
 
 
 def _proof() -> dict[str, Any]:
     p = ROOT / "config" / "proof.json"
     return json.loads(p.read_text()) if p.exists() else {}
+
+
+def _is_injective() -> bool:
+    return os.environ.get("EXECUTION_BACKEND", "").lower() == "injective"
+
+
+def _explorer_tx_base() -> str:
+    """Explorer tx-URL base for the active chain. Env-overridable (INJ_EXPLORER_TX) because the
+    Injective EVM testnet explorer domain is still being finalised."""
+    if _is_injective():
+        return os.environ.get("INJ_EXPLORER_TX", "https://testnet.blockscout.injective.network/tx/")
+    return "https://bscscan.com/tx/"
+
+
+def _executions() -> list[dict[str, Any]]:
+    """On-chain bound orders: each execution joined to its receipt, with the cid==receipt check and
+    an explorer link. This is the Injective-specific proof — the order Helix recorded carries the
+    committed receipt's hash as its cid, so an objective on-chain fill maps back to one signed
+    decision. Empty on BNB (that path books fills off the ERC-20 wallet, not a cid-bearing order)."""
+    from agent.policy import execlog
+    from agent.policy.receipt import receipt_cid
+
+    recs = {r["hash"]: r for r in ReceiptChain().read_all()}
+    base = _explorer_tx_base()
+    out: list[dict[str, Any]] = []
+    for e in execlog.read_all():
+        rh = e.get("receipt_hash", "")
+        rcpt = recs.get(rh, {})
+        cid = e.get("cid", "")
+        tx = e.get("tx", "")
+        out.append({
+            "seq": e.get("receipt_seq"),
+            "ts": e.get("ts", ""),
+            "side": e.get("order_type", ""),
+            "amount_usd": e.get("amount_usd"),
+            "quantity_base": e.get("quantity_base"),
+            "cid": cid,
+            "receipt_hash": rh,
+            "cid_ok": bool(cid) and cid == receipt_cid(rh),
+            "verdict": rcpt.get("verdict", ""),
+            "tx": tx,
+            "order_hash": e.get("order_hash", ""),
+            "explorer": (base + ("0x" + tx if tx and not tx.startswith("0x") else tx)) if tx else "",
+            "executed": bool(e.get("executed")),
+        })
+    return out
 
 
 def _jsonl(p) -> list[dict[str, Any]]:
@@ -89,7 +141,16 @@ async def api_overview():
                                        repo_url=_proof().get("repo_url", "")),
         "proof": _proof(),
         "universe": cfg.get("universe", []),
+        "chain": "injective" if _is_injective() else "bsc",
     }
+
+
+@app.get("/api/executions")
+async def api_executions():
+    ex = _executions()
+    return {"executions": list(reversed(ex)), "total": len(ex),
+            "all_bound": all(e["cid_ok"] for e in ex) if ex else True,
+            "chain": "injective" if _is_injective() else "bsc"}
 
 
 @app.get("/api/equity")
@@ -229,7 +290,7 @@ pre{background:#0b0d15;border:1px solid var(--line);border-radius:10px;padding:1
 <header>
   <div class="logo">SUMPLUS <span class="b">TRADER</span></div>
   <span class="live"><span class="dot"></span> LIVE</span>
-  <span class="tag">Verifiable autonomous trading on BNB Chain</span>
+  <span class="tag" id="chaintag">Verifiable autonomous trading</span>
   <div class="stack">
     <span class="layer l-tw"><i></i>TWAK · self-custody</span>
     <span class="layer l-id"><i></i>ERC-8004 · identity</span>
@@ -270,6 +331,12 @@ pre{background:#0b0d15;border:1px solid var(--line);border-radius:10px;padding:1
   </div>
 </div>
 
+<div class="card section" id="execcard" style="display:none">
+  <p class="h">On-chain bound orders <span class="pill" id="execsub">—</span></p>
+  <div class="vmeta" style="color:var(--mut);margin:-6px 0 12px">Each Helix order carries its committed receipt's hash as the order <span class="mono">cid</span>. The objective fill on chain maps back to exactly one signed decision — tamper with the decision and the cid no longer matches.</div>
+  <div class="feed" id="execs"></div>
+</div>
+
 <footer id="foot"></footer>
 </div>
 
@@ -292,7 +359,9 @@ async function load(){
      <div><div class="vmeta">committed policy hash</div><div class="mono hash">${short(vr.committed_policy_hash)}</div></div>
      <div class="vline"></div>
      <div class="vmeta">${vr.receipts} receipts · chain intact ${vr.chain_intact?'✓':'✗'} · all reference committed hash ${vr.all_reference_committed_hash?'✓':'✗'}<br>
-       recompute from <span class="mono">config/strategy.json</span> to verify — rules were fixed before the market moved</div>`;
+       recompute from <span class="mono">${o.chain==='injective'?'config/strategy.injective.json':'config/strategy.json'}</span> to verify — rules were fixed before the market moved</div>`;
+
+  $('#chaintag').textContent='Verifiable autonomous trading on '+(o.chain==='injective'?'Injective (Helix)':'BNB Chain');
 
   const ret=o.return_pct, rcls=ret>0?'up':ret<0?'down':'neutral';
   $('#kpis').innerHTML=[
@@ -328,6 +397,28 @@ async function load(){
   ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
   equity();
+  executions();
+}
+
+function executions(){
+  fetch('/api/executions').then(r=>r.json()).then(d=>{
+    if(!d.total){$('#execcard').style.display='none';return;}
+    $('#execcard').style.display='';
+    $('#execsub').textContent=`${d.total} order${d.total>1?'s':''} · all bound ${d.all_bound?'✓':'✗'} · ${d.chain}`;
+    $('#execs').innerHTML=d.executions.map(e=>{
+      const t=(e.ts||'').slice(11,16);
+      const side=(e.side||'').toUpperCase();
+      const link=e.explorer?`<a class="mono" href="${e.explorer}" target="_blank">tx ${short(e.tx)} ↗</a>`:`<span class="mono hh">${short(e.tx)}</span>`;
+      return `<div class="row" style="cursor:default">
+        <div class="t">${t}</div>
+        <div>
+          <div class="desc">${side} INJ · $${fmt(e.amount_usd)} <span class="hh">(${fmt(e.quantity_base)} INJ)</span></div>
+          <div class="rs">cid <span class="mono">${e.cid}</span> = receipt #${e.seq} hash prefix</div>
+          <div class="rs">${link}</div>
+        </div>
+        <div style="text-align:right"><span class="badge ${e.cid_ok?'b-trade':'b-reject'}">${e.cid_ok?'bound ✓':'unbound ✗'}</span></div>
+      </div>`}).join('');
+  });
 }
 
 function gauge(dd,gate,kill){

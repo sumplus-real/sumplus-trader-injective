@@ -23,3 +23,6 @@ contracts/injective/out/
 contracts/injective/cache/
 contracts/injective/.deploy.env
 contracts/injective/.testnet_wallet.json
+
+# Injective demo run artifacts (local)
+.demo_injective/
