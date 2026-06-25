@@ -90,7 +90,14 @@ def publish(*, dry_run: bool = True, chain: str | None = None) -> dict[str, Any]
     tag, data = commitment_calldata(ph)
     commitment = build_commitment(agent_id=prof["agent_id"],
                                   repo_url=os.environ.get("REPO_URL", ""))
-    commitment["policy_hash"] = ph  # keep the commitment payload on the chain we're publishing for
+    # Point the commitment payload at the config we actually hashed for this chain.
+    commitment["policy_hash"] = ph
+    if prof["config_path"]:
+        rel = os.path.relpath(prof["config_path"], ROOT) if os.path.isabs(prof["config_path"]) \
+            else prof["config_path"]
+        commitment["config_file"] = rel
+        commitment["note"] = (f"Every live decision receipt references policy_hash. "
+                              f"Recompute it from {rel} to verify.")
 
     if dry_run or not prof["key"] or not prof["address"]:
         return {"dry_run": True, "chain": prof["chain"], "chain_id": prof["chain_id"],
