@@ -1,29 +1,31 @@
-# Sumplus Trader
+# Sumplus Trader on Injective
 
-> **Injective Nova submission — you are on the `injective` branch.**
-> This branch ports the verifiable-decision core to Injective EVM and the Helix on-chain order book.
-> Every decision the agent makes is bound to an on-chain Helix order anyone can verify against a
-> policy committed before trading started. Start here: **[`docs/INJECTIVE_DEMO.md`](docs/INJECTIVE_DEMO.md)**.
-> The verified testnet artifacts (14 hash-chained receipts, 2 cid-bound orders) live in
-> [`demo/injective/`](demo/injective/). On-chain proof (chain 1439): commit `a3c8707b…`,
-> bound BUY `d31ba264…`, bound SELL `107d6935…`.
-> The README below describes the original BNB build, which the Injective version is built on.
+An autonomous trading agent on Injective whose every decision anyone can independently verify.
+Before it trades, it publishes the hash of its strategy on chain. Every decision it then makes
+becomes a hash-chained receipt, and every order it places on Helix carries that receipt's hash as
+its on-chain client id. The order the exchange matched maps back to exactly one signed decision,
+against rules the agent fixed before the market moved.
 
-A self-custody AI trader on BSC that can show its work. It runs unattended for a week, and when
-the week is over anyone can check that it never broke its own rules. Built for the BNB Hack: AI
-Trading Agent Edition.
+Built for Injective Nova. **Start with [`docs/INJECTIVE_DEMO.md`](docs/INJECTIVE_DEMO.md).** The
+verified testnet artifacts (14 hash-chained receipts, 2 cid-bound Helix orders) ship in
+[`demo/injective/`](demo/injective/), so anyone can verify rule-adherence without re-running
+anything.
 
-Most trading bots ask you to trust a screenshot of their returns. This one commits its policy
-on-chain before the market opens, then writes a hash-chained receipt for every decision it makes
-over the next week. Each receipt points back to that commitment. Clone the repo, recompute the
-hash, and you can confirm the agent traded by rules that were fixed before it knew which way the
-market would go. The returns are almost beside the point. What this setup proves is that an agent
-stayed inside its mandate the whole week while nobody was watching.
+**On-chain proof (Injective EVM testnet, chain 1439).** Commit `a3c8707b…`, bound BUY `d31ba264…`
+(cid `299b3af4…` equals receipt #0), bound SELL `107d6935…` (cid `a6f8f83b…` equals receipt #11).
 
-It rests on three pieces. TWAK signs every transaction with keys that stay on the machine.
-ERC-8004 gives the agent an on-chain identity that carries the policy commitment. Maria writes the
-tamper-evident decision trail. Market data comes from the CoinMarketCap MCP server and nowhere
-else, paid per request over x402.
+## How it binds to Injective
+
+Helix is a fully on-chain central limit order book, so each order is an on-chain object rather than
+an off-chain promise, and the Exchange precompile lets every order carry a client id into the
+chain's own records. Our SpotExecutor contract places spot orders through that precompile with the
+client id set to the decision receipt's hash. On most chains you can verify the decision. On
+Injective you can verify the decision and the fill, and confirm they are the same event.
+
+The verifiable core, the survival-first strategy, the policy engine, the CoinMarketCap data client
+paid per request over x402, and the operational hardening (watchdog, RPC failover, durable intent,
+crash-safe restart) carry over from the BNB build this is based on. TWAK keeps signing keys on the
+machine and ERC-8004 carries the agent's on-chain identity and policy commitment.
 
 ## Quickstart (no keys, no network)
 
