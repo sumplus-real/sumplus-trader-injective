@@ -36,10 +36,12 @@ _ABI_PATH = Path(os.environ.get(
     str(Path(__file__).resolve().parent.parent.parent / "abi" / "spot_executor.json"),
 ))
 
-# Injective indexer REST base (chain-exchange API). Override for testnet.
-_INDEXER_URL = os.environ.get(
-    "INJ_INDEXER_URL", "https://sentry.exchange.grpc-web.injective.network"
-).rstrip("/")
+_DEFAULT_INDEXER = "https://sentry.exchange.grpc-web.injective.network"
+
+
+def _indexer_url() -> str:
+    """Read at call time (not import) so the env override applies after launch and under tests."""
+    return os.environ.get("INJ_INDEXER_URL", _DEFAULT_INDEXER).rstrip("/")
 
 
 class InjectiveError(Exception):
@@ -66,7 +68,9 @@ class InjectiveBackend(ExecutionBackend):
         bid for a sell. Falls back to INJ_REF_PRICE_INJ only if explicitly set."""
         try:
             mid = mkt.market_id(base, quote)
-            ask, bid = self._orderbook_top(mid)
+            _bd, base_dec = mkt.token(base)
+            _qd, quote_dec = mkt.token(quote)
+            ask, bid = self._orderbook_top(mid, base_dec, quote_dec)
             px = ask if side == "buy" else bid
             if px and px > 0:
                 return px
@@ -76,30 +80,33 @@ class InjectiveBackend(ExecutionBackend):
                 return Decimal(self._ref_price_env)
             raise InjectiveError(f"no reference price for {base}/{quote}: {e}") from e
 
-    def _orderbook_top(self, market_id: str) -> tuple[Decimal | None, Decimal | None]:
-        """Return (best_ask, best_bid) human prices from the indexer, or (None, None)."""
+    def _orderbook_top(self, market_id: str, base_dec: int, quote_dec: int
+                       ) -> tuple[Decimal | None, Decimal | None]:
+        """Return (best_ask, best_bid) as HUMAN prices from the indexer (v2), or (None, None).
+
+        The indexer quotes price in CHAIN format: quote-per-base in raw token units, i.e. scaled by
+        10^(quoteDec - baseDec). Multiply by 10^(baseDec - quoteDec) to get the human price
+        (e.g. INJ/USDT chain 0.00000000002 -> human 20)."""
         import httpx
 
-        url = f"{_INDEXER_URL}/api/exchange/spot/v1/orderbook/{market_id}"
-        r = httpx.get(url, timeout=15)
-        r.raise_for_status()
-        data = r.json()
-        book = data.get("orderbook", data)
-        sells = book.get("sells") or book.get("asks") or []
-        buys = book.get("buys") or book.get("bids") or []
-        ask = self._best_price(sells, want_min=True)
-        bid = self._best_price(buys, want_min=False)
-        return ask, bid
+        scale = Decimal(10) ** (base_dec - quote_dec)
+        url = f"{_indexer_url()}/api/exchange/spot/v2/orderbook/{market_id}"
+        last: Exception | None = None
+        for _ in range(3):  # the testnet indexer is intermittently flaky
+            try:
+                r = httpx.get(url, timeout=15)
+                r.raise_for_status()
+                book = r.json().get("orderbook", {})
+                ask = self._best_price(book.get("sells") or [], want_min=True, scale=scale)
+                bid = self._best_price(book.get("buys") or [], want_min=False, scale=scale)
+                return ask, bid
+            except Exception as e:  # noqa: BLE001 — retry transient errors
+                last = e
+        raise last if last else InjectiveError("orderbook unavailable")
 
     @staticmethod
-    def _best_price(levels: list[dict[str, Any]], want_min: bool) -> Decimal | None:
-        prices: list[Decimal] = []
-        for lvl in levels:
-            raw = lvl.get("price")
-            if raw is None:
-                continue
-            # Indexer returns price in API FORMAT (scaled 1e18); normalise to human.
-            prices.append(mkt.from_ufixed(int(Decimal(str(raw)))))
+    def _best_price(levels: list[dict[str, Any]], want_min: bool, scale: Decimal) -> Decimal | None:
+        prices = [Decimal(str(lvl["price"])) * scale for lvl in levels if lvl.get("price") is not None]
         if not prices:
             return None
         return min(prices) if want_min else max(prices)
@@ -143,6 +150,14 @@ class InjectiveBackend(ExecutionBackend):
         sizing = self._size(plan["base"], plan["quote"], plan["side"], amount, slippage_bps)
         market = mkt.market_id(plan["base"], plan["quote"])
 
+        # Skip orders below the market's min notional (they revert on-chain). The loop holds.
+        if sizing["amount_usd"] < mkt.MIN_NOTIONAL_USD:
+            return ExecutionResult(
+                executed=False, dry_run=self.dry_run,
+                detail={"source": "injective", "skipped": "below_min_notional",
+                        "min_notional_usd": mkt.MIN_NOTIONAL_USD, **sizing},
+            )
+
         if self.dry_run:
             return ExecutionResult(
                 executed=False, dry_run=True,
@@ -152,7 +167,7 @@ class InjectiveBackend(ExecutionBackend):
             )
 
         try:
-            tx_hash, fill = self._send_order(
+            tx_hash, order_hash = self._send_order(
                 market_id=market, order_type=plan["order_type"],
                 price_ufixed=sizing["price_ufixed"], quantity_ufixed=sizing["quantity_ufixed"],
                 cid=os.environ.get("INJ_CID", ""),
@@ -161,10 +176,14 @@ class InjectiveBackend(ExecutionBackend):
             return ExecutionResult(executed=False, dry_run=False,
                                    detail={"source": "injective", **sizing}, error=str(e))
 
+        # Injective matches spot orders in a batch at end-of-block, so the order is placed here but
+        # the fill lands in the subaccount after the block. We report the placement (tx + orderHash);
+        # the reconcile-first loop reads the actual fill from the subaccount on the next tick.
         return ExecutionResult(
             executed=bool(tx_hash), dry_run=False,
-            detail={"source": "injective", "tx": tx_hash, "market": market,
-                    "order_type": plan["order_type"], **sizing, **fill},
+            detail={"source": "injective", "tx": tx_hash, "order_hash": order_hash,
+                    "market": market, "order_type": plan["order_type"],
+                    "fill": "via_reconcile", **sizing},
         )
 
     # ---- on-chain ----------------------------------------------------------
@@ -181,7 +200,7 @@ class InjectiveBackend(ExecutionBackend):
         return mkt.subaccount_id(self.executor_addr, self.subaccount_index)
 
     def _send_order(self, market_id: str, order_type: str, price_ufixed: int,
-                    quantity_ufixed: int, cid: str) -> tuple[str, dict[str, Any]]:
+                    quantity_ufixed: int, cid: str) -> tuple[str, str]:
         w3, c = self._contract()
         acct = w3.eth.account.from_key(self._pk)
         fn = c.functions.placeSpotMarketOrder(
@@ -200,27 +219,20 @@ class InjectiveBackend(ExecutionBackend):
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
         if receipt.status != 1:
             raise InjectiveError(f"order tx reverted: {tx_hash.hex()}")
-        return tx_hash.hex(), self._read_fill(c, receipt, quantity_ufixed)
+        return tx_hash.hex(), self._read_order_hash(c, receipt)
 
     @staticmethod
-    def _read_fill(contract, receipt, requested_ufixed: int) -> dict[str, Any]:
-        """Parse the actual fill from SpotMarketOrderResult. Market orders don't rest,
-        so a partial fill (filled < requested) is normal and must be observed, not assumed."""
-        fill: dict[str, Any] = {"order_hash": "", "filled_base": None,
-                                "avg_price": None, "fill_ratio": None}
+    def _read_order_hash(contract, receipt) -> str:
+        """The orderHash from SpotMarketOrderPlaced — the join key between the committed decision
+        (carried in cid) and the objective fill (read later from the subaccount / exchange records).
+        The fill is not in this receipt: Injective matches at end-of-block, after this tx returns."""
         try:
-            evs = contract.events.SpotMarketOrderResult().process_receipt(receipt)
+            evs = contract.events.SpotMarketOrderPlaced().process_receipt(receipt)
             if evs:
-                a = evs[0]["args"]
-                fill["order_hash"] = a.get("orderHash", "")
-                filled = float(mkt.from_ufixed(int(a.get("filledQuantity", 0))))
-                fill["filled_base"] = filled
-                fill["avg_price"] = float(mkt.from_ufixed(int(a.get("avgPrice", 0))))
-                req = float(mkt.from_ufixed(int(requested_ufixed))) or None
-                fill["fill_ratio"] = (filled / req) if req else None
+                return evs[0]["args"].get("orderHash", "")
         except Exception:  # noqa: BLE001 — event decode is best-effort
             pass
-        return fill
+        return ""
 
     def read_subaccount_balances(self, symbols: list[str]) -> dict[str, float]:
         """On-chain NAV truth: available balance per symbol in the contract's subaccount.

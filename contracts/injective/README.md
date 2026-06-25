@@ -81,11 +81,26 @@ Verified testnet values (mainnet differs — re-pull before mainnet):
 - INJ/USDT spot market `0x0611780ba69656949525013d947713300f56c37b6175e02f26bffa495c3208fe`
 - USDT denom `peggy0x87aB3B4C8661e07D6372361211B96ed4Dc36B1B5` (6 decimals)
 
+- **The full agent loop placed a real filled trade.** Running `core.tick` live against
+  testnet (EXECUTION_BACKEND=injective): it reconciled NAV from the contract's
+  subaccount, sized the trade against the live Helix book (best ask read from the v2
+  indexer), passed the survival policy, and the contract market-bought INJ that crossed
+  a resting ask. The subaccount went from `INJ 0 / USDT 6.0` to `INJ 0.06 / USDT 4.80`
+  — 0.06 INJ bought for ~1.2 USDT, autonomously, end to end.
+
+Two Injective mechanics that shaped the design, both found on-chain:
+
+- **Orders match in a batch at end-of-block.** The precompile's synchronous return for a
+  spot order carries no fill, so `SpotMarketOrderPlaced` records the order placement
+  (orderHash + cid linking it to the committed decision); the actual fill is read from
+  the subaccount by the reconcile loop and from the exchange trade record (by orderHash).
+- **Min notional = 1 USDT.** Orders below it revert, so the backend skips a sub-minimum
+  order cleanly (the loop holds) rather than wasting a reverting tx.
+
 Architecture note: an EOA can call the Exchange precompile (0x65) directly for its own
 subaccount (deposit + place order both succeed), so the contract is not strictly
-required to trade. The contract is kept for the on-chain execution events
-(`SpotMarketOrderResult` carries the actual fill), owner gating, and the self-custodial
-vault model — the verifiable-execution anchor we want on-chain.
+required to trade. The contract is kept for the on-chain placement events, owner gating,
+and the self-custodial vault model — the verifiable-execution anchor we want on-chain.
 
 ## Still to do before mainnet (real money)
 

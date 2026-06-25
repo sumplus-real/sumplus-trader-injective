@@ -71,15 +71,14 @@
     },
     {
       "type": "event",
-      "name": "SpotMarketOrderResult",
+      "name": "SpotMarketOrderPlaced",
       "anonymous": false,
       "inputs": [
         { "name": "orderHash", "type": "string", "indexed": false },
         { "name": "marketID", "type": "string", "indexed": false },
         { "name": "orderType", "type": "string", "indexed": false },
-        { "name": "requestedQuantity", "type": "uint256", "indexed": false },
-        { "name": "filledQuantity", "type": "uint256", "indexed": false },
-        { "name": "avgPrice", "type": "uint256", "indexed": false },
+        { "name": "price", "type": "uint256", "indexed": false },
+        { "name": "quantity", "type": "uint256", "indexed": false },
         { "name": "cid", "type": "string", "indexed": false }
       ]
     },

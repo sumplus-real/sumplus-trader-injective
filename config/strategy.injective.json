@@ -33,11 +33,11 @@
   },
 
   "risk": {
-    "max_single_trade_pct": 0.025,
+    "max_single_trade_pct": 0.25,
     "min_single_trade_pct": 0.01,
     "max_single_trade_usd": 2,
     "max_position_pct": 0.40,
-    "max_risky_exposure_pct": 0.12,
+    "max_risky_exposure_pct": 0.20,
     "max_trades_per_hour": 4,
     "min_trade_interval_seconds": 900,
     "default_slippage_bps": 50,
@@ -46,7 +46,7 @@
     "take_profit_pct": 4.0,
     "max_hold_hours": 48,
     "max_drawdown_pct": 6.0,
-    "_comment": "max_drawdown_pct is the survival gate. Risky exposure capped low (12%) so even a deep INJ crash stays inside the gate; the ladder de-risks earlier. Absolute trade caps sized small for the testnet subaccount."
+    "_comment": "max_drawdown_pct is the survival gate. Risky exposure cap set to 20% for the testnet demo so a trade clears the market's 1 USDT min notional at small subaccount NAV; the mainnet committed config uses 12%. The drawdown ladder and elimination gate are unchanged."
   },
 
   "drawdown_ladder": [
@@ -58,7 +58,7 @@
 
   "min_trades": {
     "target_count_per_week": 12,
-    "micro_rebalance_usd": 1,
+    "micro_rebalance_usd": 1.2,
     "target_risky_ratio": 0.10,
     "rebalance_band": 0.04,
     "_comment": "Scheduled tiny in-policy rebalances guarantee the minimum qualifying trade count without overtrading."

@@ -24,6 +24,10 @@ from typing import Any
 CHAIN_ID = int(os.environ.get("INJ_CHAIN_ID", "1776"))  # Injective native EVM mainnet
 EXCHANGE_PRECOMPILE = "0x0000000000000000000000000000000000000065"
 
+# Helix markets enforce a minimum order notional (quote value). INJ/USDT mainnet+testnet = 1 USDT.
+# An order below this reverts on-chain, so the backend skips it cleanly instead. Env-overridable.
+MIN_NOTIONAL_USD = float(os.environ.get("INJ_MIN_NOTIONAL_USD", "1.0"))
+
 # symbol -> (denom, decimals). Mainnet defaults; override per-env for testnet.
 INJ_TOKENS: dict[str, tuple[str, int]] = {
     "INJ": (os.environ.get("INJ_DENOM_INJ", "inj"), 18),

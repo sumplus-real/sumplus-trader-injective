@@ -27,17 +27,17 @@ contract SpotExecutor {
 
     event Deposited(string subaccountID, string denom, uint256 amount);
     event Withdrawn(string subaccountID, string denom, uint256 amount);
-    // Emitted with the ACTUAL fill, not just the request. Injective spot market orders
-    // do not rest: any unfilled remainder is voided, so requested != filled is normal.
-    // Surfacing the real fill on-chain is what the reconcile loop and the verifiable-
-    // execution proof read.
-    event SpotMarketOrderResult(
+    // Order PLACEMENT, not fill. Injective matches spot orders in a batch at end-of-block, so the
+    // precompile's synchronous return carries no fill. This event records the on-chain commitment:
+    // the orderHash plus the cid (our hash-chained receipt id) links the committed decision to the
+    // order. The actual fill is objective chain state — read from the subaccount by the reconcile
+    // loop, and from the exchange trade record (keyed by orderHash) by anyone verifying.
+    event SpotMarketOrderPlaced(
         string orderHash,
         string marketID,
         string orderType,
-        uint256 requestedQuantity,
-        uint256 filledQuantity,
-        uint256 avgPrice,
+        uint256 price,
+        uint256 quantity,
         string cid
     );
     event OwnerTransferred(address indexed previousOwner, address indexed newOwner);
@@ -129,15 +129,7 @@ contract SpotExecutor {
         try exchange.createSpotMarketOrder(address(this), order) returns (
             IExchangeModule.CreateSpotMarketOrderResponse memory resp
         ) {
-            emit SpotMarketOrderResult(
-                resp.orderHash,
-                marketID,
-                orderType,
-                quantity,                                          // requested (base, API FORMAT)
-                ExchangeTypes.UFixed256x18.unwrap(resp.quantity),  // actually filled
-                ExchangeTypes.UFixed256x18.unwrap(resp.price),     // average fill price
-                cid
-            );
+            emit SpotMarketOrderPlaced(resp.orderHash, marketID, orderType, price, quantity, cid);
             return resp.orderHash;
         } catch Error(string memory reason) {
             revert(string(abi.encodePacked("SpotExecutor.placeSpotMarketOrder: ", reason)));

@@ -35,7 +35,10 @@ def test_classify_swap_buy_and_sell():
 
 
 def test_dry_run_quote_sizing(monkeypatch):
-    monkeypatch.setenv("INJ_REF_PRICE_INJ", "20")   # $20 / INJ, book not queried
+    # Force the order-book fallback so sizing is deterministic offline: the backend prefers the
+    # live Helix book and only falls back to INJ_REF_PRICE_INJ when the indexer is unreachable.
+    monkeypatch.setenv("INJ_INDEXER_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("INJ_REF_PRICE_INJ", "20")   # $20 / INJ fallback
     monkeypatch.delenv("INJ_RPC", raising=False)
     monkeypatch.delenv("INJ_EXECUTOR_ADDRESS", raising=False)
     b = InjectiveBackend()
@@ -51,6 +54,7 @@ def test_dry_run_quote_sizing(monkeypatch):
 
 
 def test_dry_run_execute_never_broadcasts(monkeypatch):
+    monkeypatch.setenv("INJ_INDEXER_URL", "http://127.0.0.1:1")
     monkeypatch.setenv("INJ_REF_PRICE_INJ", "20")
     monkeypatch.delenv("INJ_RPC", raising=False)
     monkeypatch.delenv("INJ_EXECUTOR_ADDRESS", raising=False)
@@ -62,6 +66,7 @@ def test_dry_run_execute_never_broadcasts(monkeypatch):
 
 
 def test_sell_worst_price_below_ref(monkeypatch):
+    monkeypatch.setenv("INJ_INDEXER_URL", "http://127.0.0.1:1")
     monkeypatch.setenv("INJ_REF_PRICE_INJ", "20")
     b = InjectiveBackend(dry_run=True)
     q = asyncio.run(b.get_quote("injective", "INJ", "USDT", "40", slippage_bps=100))
@@ -69,3 +74,13 @@ def test_sell_worst_price_below_ref(monkeypatch):
     # sell worst price = 20 * (1 - 0.01) = 19.8 ; quantity = 40/20 = 2 INJ
     assert abs(q["worst_price"] - 19.8) < 1e-9
     assert abs(q["quantity_base"] - 2.0) < 1e-9
+
+
+def test_below_min_notional_is_skipped(monkeypatch):
+    monkeypatch.setenv("INJ_INDEXER_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("INJ_REF_PRICE_INJ", "20")
+    b = InjectiveBackend(dry_run=True)
+    # $0.50 is below the 1 USDT market min notional -> skipped cleanly, never sent.
+    res = asyncio.run(b.execute_swap("injective", "USDT", "INJ", "0.5"))
+    assert res.executed is False
+    assert res.detail.get("skipped") == "below_min_notional"
