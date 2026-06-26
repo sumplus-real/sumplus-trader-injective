@@ -284,7 +284,58 @@ footer{margin-top:18px;color:var(--mut);font-size:12px;display:flex;gap:16px;fle
 .ok{color:var(--grn)} .bad{color:var(--red)}
 pre{background:#0b0d15;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;
   font-size:11.5px;color:#c8cde0}
-@media(max-width:880px){.grid{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.stack{width:100%;margin:6px 0 0}}
+/* ===== Agent Core hero ===== */
+.hero{display:grid;grid-template-columns:330px 1fr;gap:16px;margin-bottom:16px}
+.core{padding:20px 18px;display:flex;flex-direction:column;align-items:center;gap:11px;text-align:center}
+.orbwrap{position:relative;width:150px;height:150px;display:grid;place-items:center}
+.orb{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 38%,var(--oc,#48d3e0),rgba(10,11,18,0) 68%)}
+.orb .nuc{width:42px;height:42px;border-radius:50%;background:var(--oc,#48d3e0);
+  box-shadow:0 0 26px 5px var(--oc,#48d3e0);animation:breathe 3s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(.9);opacity:.85}50%{transform:scale(1.08);opacity:1}}
+.orbit{position:absolute;inset:0;border:1px dashed rgba(255,255,255,.12);border-radius:50%;animation:spin 13s linear infinite}
+.orbit i{position:absolute;top:-4px;left:50%;width:8px;height:8px;border-radius:50%;margin-left:-4px;
+  background:var(--oc,#48d3e0);box-shadow:0 0 10px var(--oc,#48d3e0)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cname{font-weight:800;letter-spacing:1.5px;font-size:18px}
+.cname .b{color:var(--mut);font-weight:600;font-size:11px;letter-spacing:1px}
+.cstate{font-size:12.5px;font-weight:800;letter-spacing:.9px;color:var(--oc,#48d3e0);text-transform:uppercase;min-height:16px}
+.cnext{font-size:11px;color:var(--mut)} .cnext b{color:var(--ink);font-variant-numeric:tabular-nums}
+.steps{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:3px}
+.step{font-size:9px;letter-spacing:.4px;padding:3px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);transition:.25s}
+.step.on{border-color:var(--oc,#48d3e0);color:var(--oc,#48d3e0);background:rgba(72,211,224,.10)}
+.think{padding:16px 18px;display:flex;flex-direction:column}
+.stream{flex:1;min-height:158px;max-height:200px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.75}
+.stream .ln{color:var(--mut);opacity:.5;white-space:pre-wrap;margin:1px 0}
+.stream .ln.cur{color:var(--ink);opacity:1}
+.stream .who{color:var(--cy);font-weight:700}
+.caret{display:inline-block;width:7px;height:13px;background:var(--cy);margin-left:1px;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+/* proof spine */
+.spine{padding:13px 18px;display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:16px}
+.pnode{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut);transition:.45s}
+.pnode .pd{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.14);transition:.45s}
+.pnode.lit{color:var(--ink)} .pnode.lit .pd{background:var(--grn);box-shadow:0 0 11px var(--grn)}
+.pconn{flex:1;min-width:18px;height:1px;background:rgba(255,255,255,.12);margin:0 9px;transition:.45s}
+.pconn.lit{background:linear-gradient(90deg,var(--grn),rgba(63,185,80,.25))}
+.spine .tail{margin-left:auto;font-size:12px;color:var(--mut)}
+.spine .tail b{color:var(--gold)}
+/* survival governor */
+.govmode{font-size:12px;font-weight:800;letter-spacing:.6px;padding:3px 11px;border-radius:999px}
+.g-normal{background:rgba(63,185,80,.14);color:var(--grn)}
+.g-caution{background:rgba(227,179,65,.16);color:var(--amb)}
+.g-defensive{background:rgba(232,132,60,.18);color:#e8843c}
+.g-lockdown{background:rgba(248,81,73,.16);color:var(--red)}
+/* action cards */
+.acard{border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:10px;
+  background:rgba(255,255,255,.02);display:grid;grid-template-columns:1fr auto;gap:4px;align-items:center}
+.acard.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55);border-color:var(--grn)}100%{box-shadow:0 0 0 16px rgba(63,185,80,0)}}
+.acard .verb{font-weight:750;font-size:13px}
+.acard .am{color:var(--mut);font-size:12px;margin-top:3px}
+.acard .am .mono{color:var(--ink)}
+@media(max-width:880px){.grid{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.stack{width:100%;margin:6px 0 0}.hero{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
 
 <header>
@@ -298,7 +349,24 @@ pre{background:#0b0d15;border:1px solid var(--line);border-radius:10px;padding:1
   </div>
 </header>
 
-<div class="card verify" id="verify"></div>
+<div class="hero">
+  <div class="card core" id="core">
+    <div class="orbwrap">
+      <div class="orbit"><i></i></div>
+      <div class="orb"><div class="nuc"></div></div>
+    </div>
+    <div class="cname">MARIA <span class="b">· SUMPLUS AGENT</span></div>
+    <div class="cstate" id="cstate">INITIALISING</div>
+    <div class="cnext">next decision in <b id="cnext">—</b></div>
+    <div class="steps" id="steps"></div>
+  </div>
+  <div class="card think">
+    <p class="h">Live reasoning <span class="pill">first-person · from the receipt chain</span></p>
+    <div class="stream" id="stream"></div>
+  </div>
+</div>
+
+<div class="card spine" id="verify"></div>
 
 <div class="grid" id="kpis"></div>
 
@@ -309,7 +377,7 @@ pre{background:#0b0d15;border:1px solid var(--line);border-radius:10px;padding:1
       <svg id="eq" viewBox="0 0 640 200" preserveAspectRatio="none" style="width:100%;height:200px"></svg>
     </div>
     <div class="card section">
-      <p class="h">Drawdown vs the 6% elimination gate</p>
+      <p class="h">Survival governor <span class="govmode g-normal" id="govmode">—</span></p>
       <div class="gauge-wrap">
         <svg id="gauge" width="190" height="120" viewBox="0 0 190 120"></svg>
         <div>
@@ -351,15 +419,18 @@ function kpi(k,v,s,cls){return `<div class="card kpi"><div class="k">${k}</div><
 
 async function load(){
   const o=await (await fetch('/api/overview')).json();
-  const vr=o.verify, ok=vr.chain_intact && vr.all_reference_committed_hash;
-  $('#verify').className='card verify'+(ok?'':' vbad');
-  $('#verify').innerHTML=
-    `<div class="vbadge ${ok?'':'vbad'}"><span class="ring">${ok?'✓':'!'}</span>${ok?'Rule adherence verified':'Verification failed'}</div>
-     <div class="vline"></div>
-     <div><div class="vmeta">committed policy hash</div><div class="mono hash">${short(vr.committed_policy_hash)}</div></div>
-     <div class="vline"></div>
-     <div class="vmeta">${vr.receipts} receipts · chain intact ${vr.chain_intact?'✓':'✗'} · all reference committed hash ${vr.all_reference_committed_hash?'✓':'✗'}<br>
-       recompute from <span class="mono">${o.chain==='injective'?'config/strategy.injective.json':'config/strategy.json'}</span> to verify — rules were fixed before the market moved</div>`;
+  const vr=o.verify;
+  const cfgname=o.chain==='injective'?'config/strategy.injective.json':'config/strategy.json';
+  const nodes=[
+    ['Policy hash committed', !!vr.committed_policy_hash],
+    [`${vr.receipts} receipts hash-chained`, vr.chain_intact && vr.all_reference_committed_hash],
+    [`${vr.executions} orders cid-bound`, vr.executions_bound],
+    ['Verifiable on explorer', !!(o.proof&&o.proof.commit_tx)],
+  ];
+  $('#verify').innerHTML =
+    nodes.map((n,i)=>`${i?`<div class="pconn ${n[1]&&nodes[i-1][1]?'lit':''}"></div>`:''}`+
+      `<div class="pnode ${n[1]?'lit':''}"><span class="pd"></span>${n[0]}</div>`).join('')+
+    `<div class="tail">Rule-adherence is proven, not promised · committed <span class="mono hash">${short(vr.committed_policy_hash)}</span> · recompute from <span class="mono">${cfgname}</span></div>`;
 
   $('#chaintag').textContent='Verifiable autonomous trading on '+(o.chain==='injective'?'Injective (Helix)':'BNB Chain');
 
@@ -379,6 +450,12 @@ async function load(){
   $('#gdd').textContent=o.peak_drawdown_pct+'%';
   $('#gdd').className='gnum '+(o.peak_drawdown_pct>=o.gate_pct?'down':'up');
   $('#gtext').innerHTML=`peak over the run · now ${o.drawdown_pct}%<br>${(o.gate_pct-o.peak_drawdown_pct).toFixed(2)}% of buffer held to the gate`;
+  const GOV={none:['NORMAL','g-normal','I have room. I take only the entries my rules allow.'],
+    halve_size:['CAUTION','g-caution','Drawdown is building. I halve my size.'],
+    no_new_risk:['DEFENSIVE','g-defensive','I stop opening risk. I only reduce.'],
+    stablecoin_mode:['LOCKDOWN','g-lockdown','I flatten to stablecoins. Missed gain is cheaper than ruin.']};
+  const gm=GOV[o.rung]||GOV.none;
+  const gel=$('#govmode'); if(gel){gel.textContent=gm[0]; gel.className='govmode '+gm[1]; gel.title=gm[2];}
 
   const rs=Object.entries(o.by_reason||{}).sort((a,b)=>b[1]-a[1]);
   const chips=rs.length?rs.map(([k,v])=>`<span class="chip"><b>${v}</b> ${k.replace(/_/g,' ')}</span>`).join(''):'<span class="chip">no abstentions yet</span>';
@@ -406,15 +483,14 @@ function executions(){
     $('#execcard').style.display='';
     $('#execsub').textContent=`${d.total} order${d.total>1?'s':''} · all bound ${d.all_bound?'✓':'✗'} · ${d.chain}`;
     $('#execs').innerHTML=d.executions.map(e=>{
-      const t=(e.ts||'').slice(11,16);
       const side=(e.side||'').toUpperCase();
+      const verb=side==='BUY'?'PLACE BUY':side==='SELL'?'PLACE SELL':side;
+      const why=side==='BUY'?'risk gate passed':'exit rule fired';
       const link=e.explorer?`<a class="mono" href="${e.explorer}" target="_blank">tx ${short(e.tx)} ↗</a>`:`<span class="mono hh">${short(e.tx)}</span>`;
-      return `<div class="row" style="cursor:default">
-        <div class="t">${t}</div>
+      return `<div class="acard">
         <div>
-          <div class="desc">${side} INJ · $${fmt(e.amount_usd)} <span class="hh">(${fmt(e.quantity_base)} INJ)</span></div>
-          <div class="rs">cid <span class="mono">${e.cid}</span> = receipt #${e.seq} hash prefix</div>
-          <div class="rs">${link}</div>
+          <div class="verb">ACTION · ${verb} ${fmt(e.quantity_base)} INJ <span class="hh">($${fmt(e.amount_usd)})</span></div>
+          <div class="am">why <b style="color:var(--ink)">${why}</b> · cid <span class="mono">${e.cid}</span> = receipt #${e.seq} · ${link}</div>
         </div>
         <div style="text-align:right"><span class="badge ${e.cid_ok?'b-trade':'b-reject'}">${e.cid_ok?'bound ✓':'unbound ✗'}</span></div>
       </div>`}).join('');
@@ -454,6 +530,7 @@ const KIND={trade:'b-trade',clamp:'b-clamp',reject:'b-reject',abstain:'b-abstain
 function feed(){
   fetch('/api/feed?limit=50').then(r=>r.json()).then(d=>{
     $('#feedn').textContent=d.total+' receipts';
+    RECS=(d.feed||[]).slice().reverse(); startAgent();
     $('#feed').innerHTML=d.feed.map(r=>{
       const dec=r.decision||{}, side=(dec.side||'').toUpperCase();
       const what=r.kind==='hold'?'HOLD':`${side} ${dec.from_token}→${dec.to_token} $${fmt(dec.amount_usd)}`;
@@ -485,6 +562,51 @@ async function replay(seq){
 }
 function closeM(){$('#modal').classList.remove('on')}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
+
+/* ===== MARIA agent loop: cinematically steps through the real receipt chain ===== */
+let RECS=[], ci=0, cdt=0, agentStarted=false;
+const STEP_MS=2800;
+const STATE={
+  trade:['PLACING ORDER','#3fb950'], enter:['PLACING ORDER','#3fb950'], exit:['CLOSING POSITION','#3fb950'],
+  clamp:['SIZING TO POLICY','#f0b90b'], reject:['RULE BLOCKED','#f85149'],
+  abstain:['PRESERVING CAPITAL','#8b7cf6'], hold:['HOLDING','#8b91a7'],
+};
+const STEPS=['WATCH','SCORE','VERIFY','ACT'];
+function setSteps(active){
+  const el=$('#steps'); if(!el)return;
+  el.innerHTML=STEPS.map((s,i)=>`<span class="step ${i<=active?'on':''}">${s}</span>`).join('');
+}
+function narr(r){
+  const d=r.decision||{}, to=(d.to_token||'').toUpperCase(), from=(d.from_token||'').toUpperCase(), amt=fmt(d.amount_usd), seq=r.seq;
+  if(r.kind==='trade'||r.kind==='enter') return `Signals agreed. I bought ${to} for $${amt} and bound the order to receipt #${seq}.`;
+  if(r.kind==='exit') return `Exit rule fired. I closed ${from} and logged receipt #${seq}.`;
+  if(r.kind==='clamp') return `Policy capped the size. I placed only what the rules allow, receipt #${seq}.`;
+  if(r.kind==='reject') return `Policy said no. I did not trade, and logged the refusal as receipt #${seq}.`;
+  if(r.kind==='abstain'||r.kind==='hold') return `No qualifying edge. I held, and logged the abstention as receipt #${seq}.`;
+  return `Decision committed as receipt #${seq}.`;
+}
+function pushLine(txt){
+  const s=$('#stream'); if(!s)return;
+  s.querySelectorAll('.ln.cur').forEach(n=>n.className='ln');
+  const ln=document.createElement('div'); ln.className='ln cur'; s.appendChild(ln);
+  while(s.children.length>7) s.removeChild(s.firstChild);
+  const who=`<span class="who">MARIA ›</span> `;
+  let i=0;
+  const tw=setInterval(()=>{ i++; ln.innerHTML=who+txt.slice(0,i)+'<span class="caret"></span>';
+    if(i>=txt.length){clearInterval(tw); ln.innerHTML=who+txt;} },18);
+}
+function agentStep(){
+  if(!RECS.length)return;
+  const r=RECS[ci%RECS.length]; ci++;
+  const core=$('#core');
+  // think: light WATCH -> SCORE -> VERIFY, then settle on the outcome state
+  core.style.setProperty('--oc','#48d3e0'); $('#cstate').textContent='EVALUATING'; setSteps(0);
+  let si=0; const sint=setInterval(()=>{ si++; setSteps(si); if(si>=2){clearInterval(sint);
+    const st=STATE[r.kind]||STATE.hold; $('#cstate').textContent=st[0]; core.style.setProperty('--oc',st[1]); setSteps(3); pushLine(narr(r)); } },430);
+  cdt=Math.round(STEP_MS/1000);
+}
+setInterval(()=>{ if(cdt>0){cdt--; const e=$('#cnext'); if(e)e.textContent='00:0'+cdt;} },1000);
+function startAgent(){ if(agentStarted||!RECS.length)return; agentStarted=true; agentStep(); setInterval(agentStep,STEP_MS); }
 
 load();feed();setInterval(()=>{load();feed()},4000);
 </script></body></html>"""
