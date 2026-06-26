@@ -1,8 +1,10 @@
 # Runtime deps for the deployed container (live loop + dashboard) ONLY.
-# Excludes web3 — it is used solely by the one-time identity/commit scripts (run by hand
-# before the window), never by the loop or the dashboard, so it stays out of the image.
+# web3 is required at runtime by the Injective execution backend (reconcile + place orders
+# on the Helix Exchange precompile). The BNB/twak backend does not need it, but the live
+# Injective loop does, so it must be in the image.
 fastapi>=0.110
 uvicorn>=0.29
 httpx>=0.27
 pydantic>=2.0
 python-dotenv>=1.0
+web3>=7.0
