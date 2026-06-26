@@ -1,5 +1,0 @@
-{"ts": 1782182003.4705122, "provider": "coinmarketcap", "endpoint": "mock/quotes", "symbols": ["WBNB", "BTCB", "ETH", "CAKE", "USDT", "USDC"], "price_usdc": 0.01, "network": "base", "mode": "simulated"}
-{"ts": 1782182034.787776, "provider": "coinmarketcap", "endpoint": "mock/quotes", "symbols": ["WBNB", "BTCB", "ETH", "CAKE", "USDT", "USDC"], "price_usdc": 0.01, "network": "base", "mode": "simulated"}
-{"ts": 1782182034.789797, "provider": "coinmarketcap", "endpoint": "mock/quotes", "symbols": ["WBNB", "BTCB", "ETH", "CAKE", "USDT", "USDC"], "price_usdc": 0.01, "network": "base", "mode": "simulated"}
-{"ts": 1782182063.3558059, "provider": "coinmarketcap", "endpoint": "mock/quotes", "symbols": ["WBNB", "BTCB", "ETH", "CAKE", "USDT", "USDC"], "price_usdc": 0.01, "network": "base", "mode": "simulated"}
-{"ts": 1782182063.3586812, "provider": "coinmarketcap", "endpoint": "mock/quotes", "symbols": ["WBNB", "BTCB", "ETH", "CAKE", "USDT", "USDC"], "price_usdc": 0.01, "network": "base", "mode": "simulated"}

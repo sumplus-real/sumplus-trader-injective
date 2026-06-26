@@ -38,7 +38,7 @@ if [ "${FORCE_RESEED:-}" = "1" ] && [ ! -f "$DATA_DIR/.reseeded" ]; then
 fi
 # Committed demo files give the dashboard something to render and let the receipt chain
 # continue from the published history. Never overwrite data already on the volume.
-for f in receipts.jsonl ledger.jsonl abstentions.jsonl x402_receipts.jsonl sim_equity.jsonl; do
+for f in receipts.jsonl ledger.jsonl abstentions.jsonl x402_receipts.jsonl sim_equity.jsonl executions.jsonl; do
   if [ ! -f "$DATA_DIR/$f" ] && [ -f "/app/$f" ]; then
     cp "/app/$f" "$DATA_DIR/$f"
     echo "[entrypoint] seeded $f"
