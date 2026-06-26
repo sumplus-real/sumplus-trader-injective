@@ -100,11 +100,16 @@ def decide(views: list[TokenView], portfolio: PortfolioState, cfg: dict, now_ts:
             return Intent("exit", chain, sym, quote, round(usd, 2), 0.9, reason)
 
     # 2. ENTRIES — only if the ladder permits new risk and there is exposure room.
+    # Only universe (investable) tokens are entry candidates. Quote/stablecoins are the
+    # cash leg and must never be ranked as a buy target: a stablecoin's noise momentum can
+    # otherwise read as "risk_on" and yield a nonsensical quote->quote (e.g. USDT->USDT) intent.
+    universe_set = {t.upper() for t in cfg.get("universe", [])}
+    entry_views = [v for v in views if v.symbol.upper() in universe_set]
     max_risky = float(risk.get("max_risky_exposure_pct", 0.20))
     room = max_risky - portfolio.risky_exposure_pct
     can_take_risk = rung in ("none", "halve_size") and room > 0.01
     if can_take_risk:
-        ranked = rank_entries(views, cfg.get("signal", {}))
+        ranked = rank_entries(entry_views, cfg.get("signal", {}))
         for v, r in ranked:
             if v.symbol.upper() in portfolio.positions:
                 continue  # already long
@@ -122,8 +127,16 @@ def decide(views: list[TokenView], portfolio: PortfolioState, cfg: dict, now_ts:
     can_rebalance = portfolio.seconds_since_last_trade >= float(risk["min_trade_interval_seconds"])
     if can_rebalance and rung != "stablecoin_mode":
         if portfolio.risky_exposure_pct < target - band and can_take_risk:
-            ranked = rank_entries(views, cfg.get("signal", {}))
+            ranked = rank_entries(entry_views, cfg.get("signal", {}))
             tok = ranked[0][0].symbol.upper() if ranked else None
+            if not tok:
+                # Scheduled rebalance (committed min_trades intent: "guarantee the minimum
+                # qualifying trade count"). When no token is risk_on, still nudge toward the
+                # target risky ratio using the calmest (lowest-vol) un-held universe token,
+                # so the minimum trade count is met without chasing momentum.
+                calm = sorted((v for v in entry_views if v.symbol.upper() not in portfolio.positions),
+                              key=lambda v: v.vol_24h_pct if v.vol_24h_pct is not None else 1e9)
+                tok = calm[0].symbol.upper() if calm else None
             if tok:
                 return Intent("rebalance", chain, quote, tok, round(micro, 2), 0.4,
                               f"micro-rebalance up toward {target*100:.0f}% risky ({tok})")
@@ -137,7 +150,7 @@ def decide(views: list[TokenView], portfolio: PortfolioState, cfg: dict, now_ts:
         why = "drawdown_proximity"
     elif room <= 0.01:
         why = "exposure_full"
-    elif not rank_entries(views, cfg.get("signal", {})):
+    elif not rank_entries(entry_views, cfg.get("signal", {})):
         why = "regime_conflict"
     else:
         why = "rate_or_interval"
