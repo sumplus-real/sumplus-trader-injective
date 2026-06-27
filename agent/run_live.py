@@ -153,8 +153,12 @@ async def _loop_once_forever() -> None:
     # The backend stays in dry-run until RPC+contract+key are set; only read chain when truly live.
     inj_reconcile = is_injective and not getattr(backend, "dry_run", True)
     rpc = _rpc_pool() if exec_mode == "live" and wallet and not is_injective else None
-    seed_nav = float(os.environ.get("START_NAV", "500"))
-    if not state.get("high_water_mark"):
+    # Seed the high-water mark only for chains with a known fiat start (BNB live = $500).
+    # Injective reconciles real testnet NAV (single-digit USD), so seeding a $500 hwm there
+    # pins drawdown at ~99% forever. Leave it unset and let the first reconcile/tick set hwm
+    # from the actual NAV. Override with START_NAV when a real starting balance is known.
+    seed_nav = float(os.environ.get("START_NAV", "0" if is_injective else "500"))
+    if not state.get("high_water_mark") and seed_nav > 0:
         state["high_water_mark"] = seed_nav
 
     interval = cfg["loop"]["tick_seconds"]
